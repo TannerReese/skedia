@@ -1,3 +1,9 @@
+# Build
+skedia
+
+# Vim Swap Files
+*.sw*
+
 # Prerequisites
 *.d
 
