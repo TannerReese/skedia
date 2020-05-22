@@ -3,21 +3,17 @@
 
 #include <ncurses.h>
 
-// "The Terminal" refers to the terminal into which the graph is drawn by ncurses
-// "The Plane" refers to the infinite 2D real plane which the graph is viewing
 typedef struct{
-	// Define the characteristics of the graph when drawn in ncurses
-	// X, Y coordinate of the left corner of the graph in the terminal
-	int tx, ty;
-	// Width and Height of the graph in the terminal
-	int tw, th;
+	// Ncurses window to draw graph to
+	WINDOW* win;
 	
 	// Define the characteristics of the graph within the plane
 	// X, Y coordinate of the left corner within the plane
-	double px, py;
+	double x, y;
 	// Width and Height of the graph in the plane
-	double pw, ph;
+	double wid, hei;
 } graph_t;
+
 
 // Both return booleans indicating whether the given values are within bounds
 // Convert from the location in the window to the graph coordinates

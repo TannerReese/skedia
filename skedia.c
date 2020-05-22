@@ -40,7 +40,7 @@ double eval_eqlt(void *inp, double x, double y);
 
 
 // Store location and size of graph in terminal and in the plane
-graph_t grp = {0, 0, 1000, 1000, -5, 5, 10, 10};
+graph_t grp = {NULL, -5, 5, 10, 10};
 
 error_t parse_opt(int key, char *arg, struct argp_state *state);
 
@@ -54,6 +54,7 @@ struct argp_option options[] = {
 };
 struct argp argp = {options, parse_opt, "-i EQUATION1 [-c COLOR1] [-i EQUATION2 [-c COLOR2] ...", "Graph curves and functions\vColors are designated as red: r, green: g, blue: b, cyan: c, yellow: y, or magenta: m"};
 
+
 int main(int argc, char *argv[]){
 	argp_parse(&argp, argc, argv, 0, NULL, NULL);
 	
@@ -64,6 +65,7 @@ int main(int argc, char *argv[]){
 	keypad(stdscr, TRUE);
 	noecho();
 	curs_set(0);
+	refresh(); // Needed to allow sub-windows to draw
 	
 	// Init all colors for curves
 	start_color();
@@ -74,19 +76,22 @@ int main(int argc, char *argv[]){
 	init_pair(5, COLOR_YELLOW, COLOR_BLACK);
 	init_pair(6, COLOR_MAGENTA, COLOR_BLACK);
 	
+	// Use whole screen for graph
+	grp.win = stdscr;
 	
 	int c;
 	bool running = 1;
 	while(running){
-		clear();
-		getmaxyx(stdscr, grp.th, grp.tw);
+		// Clear graph window
+		wclear(grp.win);
 		draw_gridlines(grp);
+		// Draw functions
 		for(eqlt_t *eq = equals; eq; eq = eq->next){
-			attron(COLOR_PAIR(eq->color_pair));
+			wattron(grp.win, COLOR_PAIR(eq->color_pair));
 			draw_curve(grp, eval_eqlt, eq);
-			attroff(COLOR_PAIR(eq->color_pair));
+			wattroff(grp.win, COLOR_PAIR(eq->color_pair));
 		}
-		refresh();
+		wrefresh(grp.win);
 		
 		c = getch();
 		switch(c){
@@ -95,13 +100,13 @@ int main(int argc, char *argv[]){
 			break;
 			
 			// Movement controls
-			case KEY_DOWN: grp.py -= grp.ph / 10;
+			case KEY_DOWN: grp.y -= grp.hei / 10;
 			break;
-			case KEY_UP: grp.py += grp.ph / 10;
+			case KEY_UP: grp.y += grp.hei / 10;
 			break;
-			case KEY_LEFT: grp.px -= grp.pw / 10;
+			case KEY_LEFT: grp.x -= grp.wid / 10;
 			break;
-			case KEY_RIGHT: grp.px += grp.pw / 10;
+			case KEY_RIGHT: grp.x += grp.wid / 10;
 			break;
 			
 			// Dilation controls in each dimension
@@ -119,11 +124,12 @@ int main(int argc, char *argv[]){
 			break;
 			case '=': zoom_graph(&grp, 0.9, 0.9);
 			break;
-			case '0': setdims_graph(&grp, 2, 2);
+			case '0': setdims_graph(&grp, 10, 10);
 			break;
 		}
 	}
 	
+	delwin(grp.win);
 	endwin();
 	return 0;
 }
@@ -161,18 +167,18 @@ error_t parse_opt(int key, char *arg, struct argp_state *state){
 	switch(key){
 		case 'w':
 			if(sscanf(arg, "%lf", &x)){
-				setdims_graph(&grp, x, grp.ph);
+				setdims_graph(&grp, x, grp.hei);
 			}else argp_usage(state);
 		break;
 		case 'h':
 			if(sscanf(arg, "%lf", &y)){
-				setdims_graph(&grp, grp.pw, y);
+				setdims_graph(&grp, grp.wid, y);
 			}else argp_usage(state);
 		break;
 		case 'e':
 			if(sscanf(arg, "%lf,%lf", &x, &y) != EOF){
-				grp.px = x - grp.pw / 2;
-				grp.py = y + grp.ph / 2;
+				grp.x = x - grp.wid / 2;
+				grp.y = y + grp.hei / 2;
 			}else argp_usage(state);
 		break;
 		case 'c':

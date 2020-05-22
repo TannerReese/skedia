@@ -2,18 +2,23 @@
 #include <string.h>
 #include "graph.h"
 
+
 bool to_graph(graph_t gr, int tx, int ty, double *px, double *py){
-	if(px) *px = gr.px + (tx - gr.tx) * gr.pw / gr.tw;
-	if(py) *py = gr.py - (ty - gr.ty) * gr.ph / gr.th;
+	int tw, th; // Store window width and height
+	getmaxyx(gr.win, th, tw);
+	if(px) *px = gr.x + tx * gr.wid / tw;
+	if(py) *py = gr.y - ty * gr.hei / th;
 	
-	return gr.tx <= tx && tx < gr.tx + gr.tw && gr.ty <= ty && ty < gr.ty + gr.th;
+	return 0 <= tx && tx < tw && 0 <= ty && ty < th;
 }
 
 bool from_graph(graph_t gr, double px, double py, int *tx, int *ty){
-	if(tx) *tx = gr.tx + (int) ((px - gr.px) * gr.tw / gr.pw);
-	if(ty) *ty = gr.ty + (int) ((gr.py - py) * gr.th / gr.ph);
+	int tw, th; // Store window width and height
+	getmaxyx(gr.win, th, tw);
+	if(tx) *tx = (int) ((px - gr.x) * tw / gr.wid);
+	if(ty) *ty = (int) ((gr.y - py) * th / gr.hei);
 	
-	return gr.px <= px && px < gr.px + gr.pw && gr.py - gr.ph < py && py <= gr.py;
+	return gr.x <= px && px < gr.x + gr.wid && gr.y - gr.hei < py && py <= gr.y;
 }
 
 
@@ -21,23 +26,23 @@ bool from_graph(graph_t gr, double px, double py, int *tx, int *ty){
 void zoom_graph(graph_t *gr, double scaleX, double scaleY){
 	if(scaleX != 1){
 		// Move gr.px so that center of viewport remains unmoved horizontally
-		gr->px -= gr->pw * (scaleX - 1) / 2;
-		gr->pw *= scaleX;
+		gr->x -= gr->wid * (scaleX - 1) / 2;
+		gr->wid *= scaleX;
 	}
 	
 	if(scaleY != 1){
 		// Move gr.py so that center of viewport remains unmoved vertically
-		gr->py += gr->ph * (scaleY - 1) / 2;
-		gr->ph *= scaleY;
+		gr->y += gr->hei * (scaleY - 1) / 2;
+		gr->hei *= scaleY;
 	}
 }
 
 void setdims_graph(graph_t *gr, double w, double h){
-	gr->px += (gr->pw - w) / 2;
-	gr->py -= (gr->ph - h) / 2;
+	gr->x += (gr->wid - w) / 2;
+	gr->y -= (gr->hei - h) / 2;
 	
-	gr->pw = w;
-	gr->ph = h;
+	gr->wid = w;
+	gr->hei = h;
 }
 
 
@@ -45,8 +50,8 @@ void setdims_graph(graph_t *gr, double w, double h){
 void draw_gridlines(graph_t gr){
 	// Width and height between gridlines
 	double lgw, lgh;
-	lgw = log10(gr.pw / 2.5);
-	lgh = log10(gr.ph / 2.5);
+	lgw = log10(gr.wid / 2.5);
+	lgh = log10(gr.hei / 2.5);
 	
 	double cw, ch;
 	// Use greatest power of ten less than the width and height
@@ -60,8 +65,12 @@ void draw_gridlines(graph_t gr){
 	
 	// Pre-calculate the initial values of x0 and y0 for multiple uses
 	double x0_init, y0_init;
-	x0_init = cw * floor((gr.px + gr.pw) / cw);
-	y0_init = ch * (1 + floor((gr.py - gr.ph) / ch));
+	x0_init = cw * floor((gr.x + gr.wid) / cw);
+	y0_init = ch * (1 + floor((gr.y - gr.hei) / ch));
+	
+	// Store the width and height of the terminal window
+	int tw, th;
+	getmaxyx(gr.win, th, tw);
 	
 	// Calculate location of origin on screen
 	int zeroX, zeroY;
@@ -69,37 +78,37 @@ void draw_gridlines(graph_t gr){
 	
 	int x, y;
 	double x0, y0; // Store location of gridlines
-	for(x0 = x0_init; x0 > gr.px; x0 -= cw){
+	for(x0 = x0_init; x0 > gr.x; x0 -= cw){
 		from_graph(gr, x0, 0, &x, NULL);
 		
 		// Draw vertical line
-		for(y = gr.ty; y < gr.ty + gr.th; y++){
-			mvaddch(y, x, x == zeroX ? '$' : '|');
+		for(y = 0; y < th; y++){
+			mvwaddch(gr.win, y, x, x == zeroX ? '$' : '|');
 		}
 		
 		// Draw labels
-		mvprintw(gr.ty, x, "%.4lg", x0);
+		mvwprintw(gr.win, 0, x, "%.4lg", x0);
 	}
 	
-	for(y0 = y0_init; y0 <= gr.py; y0 += ch){
+	for(y0 = y0_init; y0 <= gr.y; y0 += ch){
 		from_graph(gr, 0, y0, NULL, &y);
 		
 		// Prevent second loop from overwriting labels made by first
-		if(y == gr.ty) continue;
+		if(y == 0) continue;
 		
 		// Draw horizontal line
-		for(x = gr.tx; x < gr.tx + gr.tw; x++){
-			mvaddch(y, x, y == zeroY ? '=' : '-');
+		for(x = 0; x < tw; x++){
+			mvwaddch(gr.win, y, x, y == zeroY ? '=' : '-');
 		}
 		
 		// Redraw intersections as '+'
-		for(x0 = x0_init; x0 > gr.px; x0 -= cw){
+		for(x0 = x0_init; x0 > gr.x; x0 -= cw){
 			from_graph(gr, x0, 0, &x, NULL);
-			mvaddch(y, x, y == zeroY ? '#' : '+');
+			mvwaddch(gr.win, y, x, y == zeroY ? '#' : '+');
 		}
 		
 		// Draw labels
-		mvprintw(y, gr.tx, "%.4lg", y0);
+		mvwprintw(gr.win, y, 0, "%.4lg", y0);
 	}
 }
 
@@ -126,9 +135,11 @@ static char pattern_to_char[] = {
 
 void draw_curve(graph_t gr, double (*func)(void*, double, double), void *input){
 	int x, y;
+	int tw, th; // Store terminal window dimensions
+	getmaxyx(gr.win, th, tw);
 	
 	// Store size of grid in x
-	int sz = (gr.tw + 1) * (gr.th + 1);
+	int sz = (tw + 1) * (th + 1);
 	sz = (sz % sizeof(char) != 0) + sz / sizeof(char);
 	// Create array to store signs of grid points bitwise in memory
 	char ispos[sz];
@@ -137,9 +148,9 @@ void draw_curve(graph_t gr, double (*func)(void*, double, double), void *input){
 	double px, py;
 	int i = 0;
 	// Collect the signs from each point in the grid
-	for(x = gr.tx; x <= gr.tw + gr.tx; x++){
+	for(x = 0; x <= tw; x++){
 		to_graph(gr, x, 0, &px, NULL);
-		for(y = gr.ty; y <= gr.ty + gr.th; y++){
+		for(y = 0; y <= th; y++){
 			to_graph(gr, 0, y, NULL, &py);
 			setbit(ispos, i, func(input, px, py) >= 0);
 			i++;
@@ -148,17 +159,17 @@ void draw_curve(graph_t gr, double (*func)(void*, double, double), void *input){
 	
 	char acc;
 	i = 0;
-	for(x = gr.tx; x < gr.tw + gr.tx; x++){
-		for(y = gr.ty; y < gr.th + gr.ty; y++){
+	for(x = 0; x < tw; x++){
+		for(y = 0; y < th; y++){
 			// Use acc to bitwise accumulate the corners
 			acc = 0;
 			acc |= getbit(ispos, i);
-			acc |= getbit(ispos, i + (gr.th + 1)) << 1;
+			acc |= getbit(ispos, i + (th + 1)) << 1;
 			acc |= getbit(ispos, i + 1) << 2;
-			acc |= getbit(ispos, i + (gr.th + 1) + 1) << 3;
+			acc |= getbit(ispos, i + (th + 1) + 1) << 3;
 			
 			acc = pattern_to_char[acc];
-			if(acc != ' ') mvaddch(y, x, acc);
+			if(acc != ' ') mvwaddch(gr.win, y, x, acc);
 			
 			i++;
 		}
@@ -170,6 +181,9 @@ void draw_curve(graph_t gr, double (*func)(void*, double, double), void *input){
 }
 
 void draw_func(graph_t gr, double (*func)(void*, double), void *input, bool isx_out){
+	int tw, th;
+	getmaxyx(gr.win, th, tw);
+	
 	int win, wout;
 	
 	char acc;
@@ -177,8 +191,41 @@ void draw_func(graph_t gr, double (*func)(void*, double), void *input, bool isx_
 	int x, y, top;
 	double gx, gy;
 	if(isx_out){
+		// Function for x in terms of y
+		for(y = 0; y < tw; y++){
+			// Get location of curve at beginning of cell
+			to_graph(gr, 0, y, NULL, &gy);
+			gx = func(input, gy);
+			from_graph(gr, gx, 0, &x, NULL);
+			
+			// Get location of curve at end of cell
+			to_graph(gr, 0, y + 1, NULL, &gy);
+			gx = func(input, gy);
+			from_graph(gr, gx, 0, &top, NULL);
+			
+			if(top == x){
+				// If top == x then the line passes vertically through the cell
+				mvwaddch(gr.win, y, x, '|');
+				continue;
+			}else{
+				// Draw end pieces of horizontal line
+				if(0 < x && x < tw){
+					mvwaddch(gr.win, y, x, top < x ? '\'' : '`');
+				}
+				
+				if(0 < top && top < tw){
+					mvwaddch(gr.win, y, top, top < x ? ',' : '.');
+				}
+			}
+			
+			// Draw horizontal line
+			for(top > x ? x++ : x--; x != top; top > x ? x++ : x--){
+				if(0 < x && x < tw) mvwaddch(gr.win, y, x, '-');
+			}
+		}
 	}else{
-		for(x = gr.tx; x < gr.tx + gr.tw; x++){
+		// Function for y in terms of x
+		for(x = 0; x < tw; x++){
 			// Get location of curve at beginning of cell
 			to_graph(gr, x, 0, &gx, NULL);
 			gy = func(input, gx);
@@ -191,22 +238,22 @@ void draw_func(graph_t gr, double (*func)(void*, double), void *input, bool isx_
 			
 			if(top == y){
 				// If top == y then the line passes horizontally through the cell
-				mvaddch(y, x, '-');
+				mvwaddch(gr.win, y, x, '-');
 				continue;
 			}else{
 				// Draw end pieces of vertical line
-				if(gr.ty < y && y < gr.ty + gr.th){
-					mvaddch(y, x, top < y ? '\'' : '.');
+				if(0 < y && y < th){
+					mvwaddch(gr.win, y, x, top < y ? '\'' : '.');
 				}
 				
-				if(gr.ty < top && top < gr.ty + gr.th){
-					mvaddch(top, x, top < y ? ',' : '`');
+				if(0 < top && top < th){
+					mvwaddch(gr.win, top, x, top < y ? ',' : '`');
 				}
 			}
 			
 			// Draw vertical line
 			for(top > y ? y++ : y--; y != top; top > y ? y++ : y--){
-				if(gr.ty < y && y < gr.ty + gr.th) mvaddch(y, x, '|');
+				if(0 < y && y < th) mvwaddch(gr.win, y, x, '|');
 			}
 		}
 	}
