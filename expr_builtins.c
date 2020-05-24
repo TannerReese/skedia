@@ -43,6 +43,7 @@ expr_builtin_t expr_builtin_funcs[] = {
 	{"atan",  1, 0, {{one_arg: atan}}},
 	{"atan2", 2, 0, {{two_arg: atan2}}},
 	
+	{"abs",   1, 0, {{one_arg: fabs}}},
 	{"ceil",  1, 0, {{one_arg: ceil}}},
 	{"floor", 1, 0, {{one_arg: floor}}},
 	{0}

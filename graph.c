@@ -87,7 +87,7 @@ void draw_gridlines(graph_t gr){
 		}
 		
 		// Draw labels
-		mvwprintw(gr.win, 0, x, "%.4lg", x0);
+		mvwprintw(gr.win, 0, x, "%.10lg", x0);
 	}
 	
 	for(y0 = y0_init; y0 <= gr.y; y0 += ch){
@@ -108,7 +108,7 @@ void draw_gridlines(graph_t gr){
 		}
 		
 		// Draw labels
-		mvwprintw(gr.win, y, 0, "%.4lg", y0);
+		mvwprintw(gr.win, y, 0, "%.10lg", y0);
 	}
 }
 

@@ -9,6 +9,7 @@
 /* Represent the different types of expressions
  * CONST - numeric literals (e.g. 1, 2.5, -3) and constants (e.g. e, pi)
  * ARGS - arguments to expression. Represented by index (e.g. 0 -> first argument)
+ * CACHED - evaluates to the value referenced by a double value
  * VAR - outside functions or variables defined by other expressions
  * FUNC1, FUNC2, FUNCN - builtin functions of arity 1, 2, or more, respectively. Represented by function pointer
  * ADD - sum and difference of expressions
@@ -21,7 +22,7 @@ enum expr_type{
 	EXPR_ADD, EXPR_MUL, EXPR_POW,
 	
 	// Not used outside of parsing
-	// NULL: Used for empty or uninstantiated expressions
+	// PARENTH: Represents open parenthesis during parsing
 	// COMMA: Represents comma operator which joins values into argument list 
 	EXPR_PARENTH, EXPR_COMMA
 };
@@ -163,6 +164,40 @@ expr_t constify_expr(expr_t exp){
 		exp->type = EXPR_CONST;
 	}
 	return exp;
+}
+
+// Check if exp contains any expression with the same type and relevant parameters as target
+bool expr_depends(expr_t exp, expr_t target){
+	if(exp->type == target->type){
+		switch(exp->type){
+			case EXPR_CONST: return exp->constant == target->constant;
+			case EXPR_ARGS: return exp->arg_ind == target->arg_ind;
+			case EXPR_CACHED: return exp->cache == target->cache;
+			
+			case EXPR_VAR: return exp->ref == target->ref;
+			
+			case EXPR_FUNC1: return exp->func.one_arg == target->func.one_arg;
+			case EXPR_FUNC2: return exp->func.two_arg == target->func.two_arg;
+			case EXPR_FUNCN: return exp->func.n_arg == target->func.n_arg;
+			
+			case EXPR_ADD:
+			case EXPR_MUL:
+			case EXPR_POW:
+			return 1;
+		}
+	}else if(exp->type == EXPR_CONST || exp->type == EXPR_ARGS || exp->type == EXPR_CACHED){
+		// For any leaf nodes if type doesn't match 
+		return 0;
+	}
+	
+	// Check children for match
+	for(expr_t c = exp->children; c; c = c->next){
+		if(expr_depends(c, target)){
+			return 1;
+		}
+	}
+	
+	return 0;
 }
 
 // Allocate memory on heap for new expression
@@ -338,14 +373,16 @@ static struct token_s lex_expr(const char **str, parse_err_t *err){
 	struct token_s tok;
 	*err = ERR_OK;
 	
-	if(**str == '\0'){
-		tok.type = END;
-		return tok;
-	}
 	
 	// Trim whitespace
 	while(isspace(**str)){
 		(*str)++;
+	}
+	
+	// Indicate end of token sequence
+	if(**str == '\0'){
+		tok.type = END;
+		return tok;
 	}
 	
 	// Variable Token
@@ -671,6 +708,10 @@ expr_t parse_expr(const char *src, name_trans_f callback, const char **endptr, p
 		
 		switch(tok.type){
 			case NAME:
+				// Set type to something that is not used
+				// Represents unfound name
+				tmp.type = EXPR_PARENTH;
+				
 				// Check builtin functions
 				for(int i = 0; expr_builtin_funcs[i].name[0] != '\0'; i++){
 					if(strncasecmp(tok.name, expr_builtin_funcs[i].name, EXPR_FUNCNAME_LEN < tok.length ? EXPR_FUNCNAME_LEN : tok.length) == 0){
@@ -700,7 +741,7 @@ expr_t parse_expr(const char *src, name_trans_f callback, const char **endptr, p
 				}
 				
 				// Check name translation if no builtin function matches
-				if(tmp.type == EXPR_CONST){
+				if(tmp.type == EXPR_PARENTH){
 					if(!callback(&tmp, tok.name, tok.length, trans_inp)){
 						*err = ERR_UNRECOGNIZED_NAME;
 						break;
@@ -818,6 +859,11 @@ expr_t parse_expr(const char *src, name_trans_f callback, const char **endptr, p
 				if(!push(&ops, tmp)){
 					*err = ERR_PARSE_OVERFLOW;
 				}
+			break;
+		}
+		
+		// Break if error occurs during switch
+		if(*err != ERR_OK){
 			break;
 		}
 	}
