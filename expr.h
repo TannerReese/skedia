@@ -8,16 +8,19 @@
 struct expr_s;
 typedef struct expr_s *expr_t;
 
-// Evaluate value of expression using given arguments in place of args
-double eval_expr(expr_t exp, double *args);
-// Replace expressions only dependent on constants by constants
-expr_t constify_expr(expr_t exp);
-// Check if exp contains any expression with the same type and relevant parameters as target
-bool expr_depends(expr_t exp, expr_t target);
 // Allocate memory on heap for new expression
 expr_t new_expr(void);
 // Free the heap memory allocated for an expr
 void free_expr(expr_t exp);
+// Evaluate value of expression using given arguments in place of args
+double eval_expr(expr_t exp, double *args);
+
+// Replace expressions only dependent on constants by constants
+expr_t constify_expr(expr_t exp);
+// Check if exp has the same type and relevant parameters as target
+bool expr_match(expr_t exp, expr_t target);
+// Check if exp contains any expression with the same type and relevant parameters as target
+bool expr_depends(expr_t exp, expr_t target);
 
 
 // Builtin function of any arity

@@ -79,6 +79,19 @@ void free_expr_no_self(expr_t exp){
 
 
 
+// Allocate memory on heap for new expression
+expr_t new_expr(void){
+	return malloc(sizeof(struct expr_s));
+}
+
+// Frees all memory used by expr_t including that of children expressions
+// Excludes expr_t linked by ref in EXPR_VAR
+void free_expr(expr_t exp){
+	free_expr_no_self(exp);
+	free(exp);
+}
+
+// Evaluate value of expression by evaluating children and using other expressions stored in variables
 double eval_expr(expr_t exp, double *args){
 	if(!exp) return 0;
 	
@@ -139,6 +152,8 @@ double eval_expr(expr_t exp, double *args){
 	return result;
 }
 
+
+
 expr_t constify_expr(expr_t exp){
 	// Constants (e.g. 1, 2, 3.14) are already constant
 	// Arguments (e.g. x, y, z) cannot be made constant
@@ -166,16 +181,19 @@ expr_t constify_expr(expr_t exp){
 	return exp;
 }
 
-// Check if exp contains any expression with the same type and relevant parameters as target
-bool expr_depends(expr_t exp, expr_t target){
+// Check if exp has the same type and relevant parameters as target
+bool expr_match(expr_t exp, expr_t target){
+	// Children are not consider in determining a match only the type and relevant parameters
 	if(exp->type == target->type){
 		switch(exp->type){
 			case EXPR_CONST: return exp->constant == target->constant;
 			case EXPR_ARGS: return exp->arg_ind == target->arg_ind;
 			case EXPR_CACHED: return exp->cache == target->cache;
 			
+			// Check if exp and target refer to the same variable
 			case EXPR_VAR: return exp->ref == target->ref;
 			
+			// Check if exp and target have the same function pointers
 			case EXPR_FUNC1: return exp->func.one_arg == target->func.one_arg;
 			case EXPR_FUNC2: return exp->func.two_arg == target->func.two_arg;
 			case EXPR_FUNCN: return exp->func.n_arg == target->func.n_arg;
@@ -185,6 +203,17 @@ bool expr_depends(expr_t exp, expr_t target){
 			case EXPR_POW:
 			return 1;
 		}
+	}
+	
+	// If type doesn't match exprs don't match
+	return 0;
+}
+
+// Check if exp contains any expression with the same type and relevant parameters as target
+bool expr_depends(expr_t exp, expr_t target){
+	if(expr_match(exp, target)){
+		// Check if exp and target match
+		return 1;
 	}else if(exp->type == EXPR_CONST || exp->type == EXPR_ARGS || exp->type == EXPR_CACHED){
 		// For any leaf nodes if type doesn't match 
 		return 0;
@@ -192,25 +221,12 @@ bool expr_depends(expr_t exp, expr_t target){
 	
 	// Check children for match
 	for(expr_t c = exp->children; c; c = c->next){
-		if(expr_depends(c, target)){
-			return 1;
-		}
+		if(expr_depends(c, target)) return 1;
 	}
 	
 	return 0;
 }
 
-// Allocate memory on heap for new expression
-expr_t new_expr(void){
-	return malloc(sizeof(struct expr_s));
-}
-
-// Frees all memory used by expr_t including that of children expressions
-// Excludes expr_t linked by ref in EXPR_VAR
-void free_expr(expr_t exp){
-	free_expr_no_self(exp);
-	free(exp);
-}
 
 
 
@@ -700,11 +716,15 @@ expr_t parse_expr(const char *src, name_trans_f callback, const char **endptr, p
 		tok.type != END && *err == ERR_OK;
 		tok = lex_expr(endptr, err)
 	){
+		// Ensure tmp is fully cleared
 		tmp.type = EXPR_CONST;
 		tmp.next = NULL;
 		tmp.add_inv = 0;
 		tmp.mul_inv = 0;
 		tmp.constant = 0;
+		tmp.ref = NULL;
+		tmp.child_count = 0;
+		tmp.children = NULL;
 		
 		switch(tok.type){
 			case NAME:
@@ -882,7 +902,9 @@ expr_t parse_expr(const char *src, name_trans_f callback, const char **endptr, p
 	}
 	
 	// Clean up ops stack
-	for(s = ops.head; s <= ops.ptr; s++) free_expr_no_self(s);
+	if(ops.ptr){
+		for(s = ops.head; s <= ops.ptr; s++) free_expr_no_self(s);
+	}
 	
 	// Check that there is exactly one value left on the vals stack
 	if(*err == ERR_OK){
@@ -897,7 +919,10 @@ expr_t parse_expr(const char *src, name_trans_f callback, const char **endptr, p
 	}
 	
 	// Clean up vals stack
-	for(s = vals.head; s <= vals.ptr; s++) free_expr_no_self(s);
+	// If error occurred this will clean up any loose ends
+	if(vals.ptr){
+		for(s = vals.head; s <= vals.ptr; s++) free_expr_no_self(s);
+	}
 	
 	if(*err == ERR_OK){
 		// Allocate heap memory for tmp
@@ -905,7 +930,7 @@ expr_t parse_expr(const char *src, name_trans_f callback, const char **endptr, p
 		*s = tmp;
 		return s;
 	}else{
-		// Deallocate any memory associated with tmp if an error occured
+		// Return nothing if error occurred
 		return NULL;
 	}
 }
