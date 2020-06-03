@@ -1,21 +1,53 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 #include "gallery.h"
 
 // Locations to place x, y, and redius values for evaluation of expressions
 static double xref, yref, rref;
 
+// List of arguments for variable
+static struct arg_s{
+	char *name;
+	size_t length;
+	
+	struct arg_s *next;
+} *arguments;
 
 // Functions to parse and evaluate equations
 static expr_t translate_name(expr_t exp, const char *name, size_t n, void *inp){
-	if(n > 1) return NULL;
+	if(arguments){
+		// Check argument list first if present
+		int i = 0;
+		for(struct arg_s *arg = arguments; arg; arg = arg->next){
+			if(arg->name && strncmp(arg->name, name, arg->length < n ? arg->length : n) == 0){
+				return arg_expr(exp, i);
+			}
+			i++;
+		}
+	}
 	
-	switch(*name){
-		case 'x': return cached_expr(exp, &xref);
-		case 'y': return cached_expr(exp, &yref);
-		case 'r': return cached_expr(exp, &rref);
+	// Check global variables next
+	if(n == 1){
+		switch(*name){
+			case 'x': return cached_expr(exp, &xref);
+			case 'y': return cached_expr(exp, &yref);
+			case 'r': return cached_expr(exp, &rref);
+		}
+	}
+	
+	// Finally check gallery for variable names that match
+	// inp -> head of list of equations
+	for(equat_t eq = inp; eq; eq = eq->next){
+		if(eq->is_variable // Only consider equations that represent variables
+		&& eq->name
+		&& strncmp(eq->name, name, eq->name_len < n ? eq->name_len : n) == 0
+		&& eq->right  // Ensure variable has expression
+		){
+			return apply_expr(exp, eq->right, eq->arity, NULL);
+		}
 	}
 	return NULL;
 }
@@ -72,14 +104,16 @@ void draw_gallery(WINDOW *win, equat_t top, bool show_curs){
 		y = i * (TEXTBOX_HEIGHT + 1) + TEXTBOX_HEIGHT;
 		if(y < hei - 1){
 			if(eq->err == ERR_OK){
-				// Create color picker bar at bottom
-				
-				// Use inverted color pair to indicate selection
-				wattron(win, COLOR_PAIR(eq->color_pair | (i == 0 && !(eq->curs) && show_curs ? INVERT_PAIR : 0) ));
-				for(x = 1; x < wid - 1; x++){
-					mvwaddch(win, y, x, '-');
+				if(!(eq->is_variable)){ // Only draw color bar if equation doesn't represent variable
+					// Draw color picker bar at bottom
+					
+					// Use inverted color pair to indicate selection
+					wattron(win, COLOR_PAIR(eq->color_pair | (i == 0 && !(eq->curs) && show_curs ? INVERT_PAIR : 0) ));
+					for(x = 1; x < wid - 1; x++){
+						mvwaddch(win, y, x, '-');
+					}
+					wattroff(win, COLOR_PAIR(eq->color_pair | (i == 0 && !(eq->curs) && show_curs ? INVERT_PAIR : 0)));
 				}
-				wattroff(win, COLOR_PAIR(eq->color_pair | (i == 0 && !(eq->curs) && show_curs ? INVERT_PAIR : 0)));
 			}else{
 				// Display parse error instead of color picker if there was one
 				char buf[wid - 1]; // Create buffer to store and potentially truncate error message
@@ -106,35 +140,181 @@ void draw_gallery(WINDOW *win, equat_t top, bool show_curs){
 	}
 }
 
-parse_err_t parse_equat(equat_t eq){
+
+static parse_err_t parse_var_equat(equat_t eq){
+	// Start with no arguments
+	eq->arity = 0;
+	
+	// Iterate through left side of variable
+	// Should be either <name> or <name>(<arg>, <arg>, ...)
+	bool in_parenth = 0, extra_arg = 0;
+	for(char *s = eq->text; *s != '\0'; s++){
+		// Skip whitespace
+		if(isspace(*s)) continue;
+		
+		if(isalpha(*s)){
+			// If two alphanumeric sequences are consecutive without ',', '(', or ')' throw an error
+			if(extra_arg){
+				eq->err = ERR_TOO_MANY_VALUES;
+				return eq->err;
+			}
+			
+			if(!(eq->name)){
+				// Get name of variable
+				eq->name = s;
+				while(isalnum(*s)) s++;
+				eq->name_len = (size_t)(s - eq->name);
+				s--; // Move s pointer to last alphanumeric
+			}else{
+				// Get argument and place it in arguments
+				eq->arity++;
+				
+				// Seek to end of argument list
+				struct arg_s **arg;
+				for(arg = &arguments; *arg; arg = &((*arg)->next)){}
+				
+				// Allocate memory on heap for argument
+				*arg = malloc(sizeof(struct arg_s));
+				(*arg)->name = s;
+				(*arg)->next = NULL;
+					
+				while(isalnum(*s)) s++;
+				(*arg)->length = (size_t)(s - (*arg)->name);
+				s--; // Move s pointer to last alphanumeric
+			}
+			
+			extra_arg = 1;
+		}else if(*s == '(' || *s == ')'){
+			// If parenth already open or closed throw mismatch
+			// Nested parenths not allowed
+			if(in_parenth == (*s == '(')){
+				eq->err = ERR_PARENTH_MISMATCH;
+				return eq->err;
+			}
+			
+			in_parenth = *s == '(';
+			extra_arg = 0;
+		}else if(*s == ','){
+			extra_arg = 0;
+		}else{
+			eq->err = ERR_UNUSED_CHARACTER;
+			return eq->err;
+		}
+	}
+	
+	// If parenth wasn't closed indicate parenth mismatch
+	if(in_parenth){
+		eq->err = ERR_PARENTH_MISMATCH;
+		return eq->err;
+	}
+	
+	eq->err = ERR_OK;
+	return ERR_OK;
+}
+
+parse_err_t parse_equat(equat_t gallery, equat_t eq){
+	if(eq->being_parsed) return ERR_BAD_EXPRESSION; // If equation already being parsed return
+	eq->being_parsed = 1;
+	
 	// Split arg on '=' to create the left and right strings
 	char *right;
 	for(right = eq->text; *right && *right != '='; right++){}
 	// If no '=' exists return err
 	if(!(*right)){
 		eq->err = ERR_BAD_EXPRESSION;
+		eq->being_parsed = 0;
 		return eq->err;
 	}
-	// If '=' exists break up the string
-	// And place right at the beginning of the right side
-	*(right++) = '\0';
 	
-	eq->err = ERR_OK;
 	
 	// If left hand expression already exists free it
-	if(eq->left) free_expr(eq->left);
-	// Parse left hand side
-	eq->left = parse_expr(eq->text, translate_name, NULL, &(eq->err), eq);
-	if(eq->err != ERR_OK){
-		// Undo splitting
-		*(--right) = '=';
-		return eq->err;
+	if(!(eq->is_variable) && eq->left) free_expr(eq->left);
+	
+	// If equation is separated by ':=' instead of '=' then treat equation as variable
+	if(*(right - 1) == ':'){
+		eq->is_variable = 1; // Designate equation as representing a variable
+		
+		// Initialize name to NULL
+		eq->name = NULL;
+		eq->name_len = 0;
+		
+		// Parse variable name and possibly arguments on left hand side
+		*(right - 1) = '\0';
+		eq->err = parse_var_equat(eq);
+		*(right - 1) = ':';
+		
+		if(eq->err != ERR_OK){
+			// Deallocate the arguments on error
+			struct arg_s *arg = arguments, *tmp;
+			while(arg){
+				tmp = arg->next;
+				free(arg);
+				arg = tmp;
+			}
+			arguments = NULL;
+			
+			eq->being_parsed = 0;
+			return eq->err;
+		}
+	}else{
+		eq->is_variable = 0; // Designate equation as proper equation
+		eq->err = ERR_OK;
+		
+		// Ensure no arguments are parsed on left hand side
+		arguments = NULL;
+		
+		// Parse left hand side
+		*right = '\0';  // Put null where '=' is to restrict parsing to left side
+		eq->left = parse_expr(eq->text, translate_name, NULL, &(eq->err), gallery);
+		*right = '=';  // Undo replacement
+		if(eq->err != ERR_OK){
+			eq->being_parsed = 0;
+			return eq->err;
+		}
 	}
 	
-	// If right hand expression already exists free it
-	if(eq->right) free_expr(eq->right);
+	// Move right to after the '='
+	right++;
+	
+	expr_t old_ref = eq->right; // Save right hand side to later check for dependencies and update them
+	
 	// Parse right hand side
-	eq->right = parse_expr(right, translate_name, NULL, &(eq->err), eq);
+	eq->right = parse_expr(right, translate_name, NULL, &(eq->err), gallery);
+	
+	// Deallocate the arguments
+	struct arg_s *arg = arguments, *tmp;
+	while(arg){
+		tmp = arg->next;
+		free(arg);
+		arg = tmp;
+	}
+	arguments = NULL;
+	
+	if(old_ref){
+		// Construct target to check for dependency
+		expr_t target = new_expr();
+		apply_expr(target, old_ref, 0, NULL);
+		
+		// Reparse equations dependent on this one
+		for(equat_t eq2 = gallery; eq2; eq2 = eq2->next){
+			if(eq2 == eq) continue; // Skip self
+			
+			if(!(eq2->is_variable) && eq2->left){
+				// If equation has left hand side check left for dependency
+				if(expr_depends(eq2->left, target)){
+					parse_equat(gallery, eq2);
+				}
+			}
+			
+			if(expr_depends(eq2->right, target)){
+				parse_equat(gallery, eq2);
+			}
+		}
+		
+		free_expr(target); // Deallocate dependency checking target
+		free_expr(old_ref); // Finally free right hand side
+	}
+	
 	if(eq->err != ERR_OK){
 		// Left expression successfully parsed and so must be properly deallocated
 		if(eq->left){
@@ -142,13 +322,11 @@ parse_err_t parse_equat(equat_t eq){
 			eq->left = NULL;
 		}
 		
-		// Undo splitting
-		*(--right) = '=';
+		eq->being_parsed = 0;
 		return eq->err;
 	}
 	
-	// Undo splitting
-	*(--right) = '=';
+	eq->being_parsed = 0;
 	return ERR_OK;
 }
 
@@ -162,14 +340,20 @@ equat_t add_equat(equat_t *gallery, const char *text){
 	// Place text into the textbox of the equation
 	(*new)->text[0] = '\0';
 	strncat((*new)->text, text, TEXTBOX_SIZE);
+	
+	// Clear all union values
+	(*new)->name = NULL;
+	(*new)->name_len = 0;
+	(*new)->left = NULL;
+	(*new)->color_pair = 1;
+	
+	(*new)->is_variable = 0; // Default to proper equation
 	(*new)->curs = (*new)->text;
 	
 	// Ensure that left and right are null to prevent parse_equat from accidentally freeing unallocated space
-	(*new)->left = NULL;
 	(*new)->right = NULL;
 	
 	// Set default parameters
-	(*new)->color_pair = 1;
 	(*new)->prev = prev;
 	(*new)->next = NULL;
 	

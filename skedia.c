@@ -81,9 +81,11 @@ int main(int argc, char *argv[]){
 			draw_gridlines(grp);
 			// Draw equations
 			for(equat_t eq = gallery; eq; eq = eq->next){
-				wattron(grp.win, COLOR_PAIR(eq->color_pair));
-				draw_curve(grp, eval_equat, eq);
-				wattroff(grp.win, COLOR_PAIR(eq->color_pair));
+				if(!(eq->is_variable) && eq->right){ // Only draw equation if it doesn't represent a variable
+					wattron(grp.win, COLOR_PAIR(eq->color_pair));
+					draw_curve(grp, eval_equat, eq);
+					wattroff(grp.win, COLOR_PAIR(eq->color_pair));
+				}
 			}
 			wrefresh(grp.win);
 		}
@@ -241,7 +243,7 @@ int main(int argc, char *argv[]){
 					case '\n':
 						// If in textbox parse text
 						if(gcurs->curs){
-							parse_equat(gcurs);
+							parse_equat(gallery, gcurs);
 							
 							// Update graph to reflect new equation
 							update_graph = 1;
@@ -368,7 +370,7 @@ error_t parse_opt(int key, char *arg, struct argp_state *state){
 			tmp = add_equat(&gallery, arg);
 			
 			// Parse text and check for errors
-			if(parse_equat(tmp) != ERR_OK){
+			if(parse_equat(gallery, tmp) != ERR_OK){
 				// If there is an error while parsing return it
 				fprintf(stderr, "Error %s while reading equation: %s\n", parse_errstr[(tmp)->err], arg);
 				// If expressions were created during parsing deallocate them
