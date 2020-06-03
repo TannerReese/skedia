@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include <strings.h>
 #include <math.h>
 #include <ctype.h>
@@ -66,7 +67,15 @@ struct expr_s{
 
 // Frees memory used by children of expression only
 void free_expr_no_self(expr_t exp){
-	if(exp->type != EXPR_CONST && exp->type != EXPR_ARGS && exp->type != EXPR_CACHED){
+	// Only free children if given type has children
+	if(exp->type == EXPR_VAR
+	|| exp->type == EXPR_FUNC1
+	|| exp->type == EXPR_FUNC2
+	|| exp->type == EXPR_FUNCN
+	|| exp->type == EXPR_ADD
+	|| exp->type == EXPR_MUL
+	|| exp->type == EXPR_POW
+	){
 		expr_t child = exp->children, tmp;
 		while(child){
 			free_expr_no_self(child);
@@ -269,6 +278,8 @@ expr_t cached_expr(expr_t exp, double *cache){
 
 // Apply other expressions or functions
 expr_t apply_expr(expr_t exp, expr_t var, int argc, expr_t *args){
+	free_expr_no_self(exp);
+	
 	exp->type = EXPR_VAR;
 	exp->next = NULL;
 	exp->add_inv = 0;
@@ -734,7 +745,9 @@ expr_t parse_expr(const char *src, name_trans_f callback, const char **endptr, p
 				
 				// Check builtin functions
 				for(int i = 0; expr_builtin_funcs[i].name[0] != '\0'; i++){
-					if(strncasecmp(tok.name, expr_builtin_funcs[i].name, EXPR_FUNCNAME_LEN < tok.length ? EXPR_FUNCNAME_LEN : tok.length) == 0){
+					if(strnlen(expr_builtin_funcs[i].name, EXPR_FUNCNAME_LEN) == tok.length
+					&& strncasecmp(tok.name, expr_builtin_funcs[i].name, tok.length) == 0
+					){
 						tmp.child_count = expr_builtin_funcs[i].arity;
 							
 						// Assign type to function 
