@@ -306,7 +306,8 @@ parse_err_t parse_equat(equat_t gallery, equat_t eq){
 				}
 			}
 			
-			if(expr_depends(eq2->right, target)){
+			// If equation has right hand side check right for dependency
+			if(eq2->right && expr_depends(eq2->right, target)){
 				parse_equat(gallery, eq2);
 			}
 		}
