@@ -253,26 +253,22 @@ int main(int argc, char *argv[]){
 					// Remove current textbox and equation
 					case 'D' & 0x1f:
 						if(gcurs->prev){
+							// If gcurs is not at head then connect linked before and after gcurs
 							gcurs->prev->next = gcurs->next;
 							if(gcurs->next) gcurs->next->prev = gcurs->prev;
 						}else{
 							// If gcurs at head then point gallery to next element
 							gallery = gcurs->next;
-							gcurs->next->prev = NULL;
+							if(gcurs->next) gcurs->next->prev = NULL;
 						}
 						
-						if(gcurs->left) free(gcurs->left);
+						if(!(gcurs->is_variable) && gcurs->left) free(gcurs->left);
 						if(gcurs->right) free(gcurs->right);
 						free(gcurs);
 						gcurs = gallery;
 						
 						// Update graph to remove the curve for this equation
 						update_graph = 1;
-					break;
-					
-					// Switch focus back to graph
-					case 0x1b: // '\e' or Esc
-						focus_on_graph = 1;
 					break;
 				}
 				
@@ -294,6 +290,12 @@ int main(int argc, char *argv[]){
 					// Ensure text is null terminated
 					gcurs->text[TEXTBOX_SIZE - 1] = '\0';
 				}
+			}
+			
+			// Perform regardless of if cursor is present
+			if(c == (int)0x1b){ // '\e' or Esc
+				// Switch focus back to graph
+				focus_on_graph = 1;
 			}
 		}
 		
@@ -374,7 +376,7 @@ error_t parse_opt(int key, char *arg, struct argp_state *state){
 				// If there is an error while parsing return it
 				fprintf(stderr, "Error %s while reading equation: %s\n", parse_errstr[(tmp)->err], arg);
 				// If expressions were created during parsing deallocate them
-				if(tmp->left) free_expr(tmp->left);
+				if(!(tmp->is_variable) && tmp->left) free_expr(tmp->left);
 				if(tmp->right) free_expr(tmp->right);
 				free(tmp);
 				
