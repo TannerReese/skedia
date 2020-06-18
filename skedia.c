@@ -30,7 +30,33 @@ struct argp_option options[] = {
 	{"color", 'c', "COLOR", 0, "Set the color of the curve specified before (def: red)"},
 	{0}
 };
-struct argp argp = {options, parse_opt, "-i EQUATION1 [-c COLOR1] [-i EQUATION2 [-c COLOR2] ...", "Graph curves and functions\vColors are designated as red: r, green: g, blue: b, cyan: c, yellow: y, or magenta: m"};
+struct argp argp = {
+	options, parse_opt, "-i EQUATION1 [-c COLOR1] [-i EQUATION2 [-c COLOR2] ...",
+	// Documentation String
+	"Graph curves and functions\v"
+	"Colors are designated as red: r, green: g, blue: b, cyan: c, yellow: y, or magenta: m\n"
+	"\nGraph Mode Keys:\n"
+	"    Arrows / hjkl - Move graph\n"
+	"    Shift Arrows / HJKL - Resize horizontally and vertically\n"
+	"    '=' - Zoom In\n"
+	"    '-' - Zoom Out\n"
+	"    '0' - Return to default Zoom Level\n"
+	"    Control-A (^A) - Switch to Gallery Mode and Create new textbox\n"
+	"    g or G - Switch to Gallery Mode\n"
+	"    Control-C (^C) or Control-Z (^Z) or q or Q - Exit\n"
+	"\nGallery Mode Keys:\n"
+	"    Left & Right Arrows - Move within textbox or change color\n"
+	"    Up & Down Arrows - Move between textboxes and to color picker\n"
+	"    Backspace - Remove character before cursor\n"
+	"    Home - Go to beginning of textbox\n"
+	"    End - Go to end of textbox\n"
+	"    Control-A (^A) - Create new textbox at bottom of gallery\n"
+	"    Control-D (^D) - Delete currently selected textbox and equation\n"
+	"    Esc - Switch to Graph Mode\n"
+	"    Control-C (^C) or Control-Z (^Z) - Exit\n"
+	"\nAvailable builtin functions include sqrt, cbrt, exp, ln, log10, sin, cos, tan, sec, csc, cot, sinh, cosh, tanh, asin, acos, atan, atan2, abs, ceil, and floor\n"
+	"\n"
+};
 
 
 int main(int argc, char *argv[]){
