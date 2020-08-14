@@ -35,5 +35,8 @@ void draw_curve(graph_t gr, double (*func)(void*, double, double), void *input);
 // Draw function defined by func(x) = y
 // If isx_out = 1 then func(y) = x
 void draw_func(graph_t gr, double (*func)(void*, double), void *input, bool isx_out);
+// Draw point at (x, y) using the provided character
+// Returns whether the point fell within the bounds of the graph
+bool draw_point(graph_t gr, double x, double y, const chtype ch);
 
 #endif

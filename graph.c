@@ -258,3 +258,14 @@ void draw_func(graph_t gr, double (*func)(void*, double), void *input, bool isx_
 		}
 	}
 }
+
+
+bool draw_point(graph_t gr, double x, double y, const chtype ch){
+	int tx, ty;
+	// When (x, y) is within the bounds of the screen
+	if(from_graph(gr, x, y, &tx, &ty)){
+		mvwaddch(gr.win, ty, tx, ch);
+		return 1;
+	}
+	return 0;
+}

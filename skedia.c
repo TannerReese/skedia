@@ -8,6 +8,7 @@
 
 #include "graph.h"
 #include "gallery.h"
+#include "intersect.h"
 #include "expr.h"
 
 #define KEY_SUP 0521
@@ -16,6 +17,8 @@
 
 // Linked list of equations representing the gallery and a pointer to the cursor
 equat_t gallery, gcurs;
+// Circular Linked list of intersections 
+inter_t intersections;
 
 // Store location and size of graph in terminal and in the plane
 graph_t grp = {NULL, -5, 5, 10, 10};
@@ -41,6 +44,10 @@ struct argp argp = {
 	"    '=' - Zoom In\n"
 	"    '-' - Zoom Out\n"
 	"    '0' - Return to default Zoom Level\n"
+	"    n or N - Find Intersections between curves\n"
+	"    c or C - Clear all Intersections\n"
+	"    , or < - Move to prior Intersection\n"
+	"    . or > - Move to next Intersection\n"
 	"    Control-A (^A) - Switch to Gallery Mode and Create new textbox\n"
 	"    g or G - Switch to Gallery Mode\n"
 	"    Control-C (^C) or Control-Z (^Z) or q or Q - Exit\n"
@@ -105,6 +112,7 @@ int main(int argc, char *argv[]){
 			// Draw graph
 			wclear(grp.win);  // Clear graph window
 			draw_gridlines(grp);
+			
 			// Draw equations
 			for(equat_t eq = gallery; eq; eq = eq->next){
 				if(!(eq->is_variable) && eq->right){ // Only draw equation if it doesn't represent a variable
@@ -113,6 +121,27 @@ int main(int argc, char *argv[]){
 					wattroff(grp.win, COLOR_PAIR(eq->color_pair));
 				}
 			}
+			
+			// Draw Intersections
+			if(intersections){
+				inter_t inr = intersections;
+				
+				// Display the coordinates of the selected point
+				int height, width;
+				getmaxyx(grp.win, height, width);
+				mvwprintw(grp.win, height - 1, 0, "(%.10lg, %.10lg)", inr->x, inr->y);
+				
+				do{
+					// Check if inr should be highlighted (when its pointed to by intersections)
+					wattron(grp.win, COLOR_PAIR(inr == intersections ? ((equat_t)(inr->param2))->color_pair | INVERT_PAIR : ((equat_t)(inr->param1))->color_pair));
+					draw_point(grp, inr->x, inr->y, 'O');
+					wattroff(grp.win, COLOR_PAIR(inr == intersections ? ((equat_t)(inr->param2))->color_pair | INVERT_PAIR : ((equat_t)(inr->param1))->color_pair));
+					
+					inr = inr->next;
+				}while(inr != intersections);
+				
+			}
+			
 			wrefresh(grp.win);
 		}
 		
@@ -172,6 +201,44 @@ int main(int argc, char *argv[]){
 				case '=': zoom_graph(&grp, 0.9, 0.9); // Zoom In (+)
 				break;
 				case '0': setdims_graph(&grp, 10, 10); // Zoom Standard
+				break;
+				
+				// Intersection Controls
+				case 'n': // Generate Intersections
+				case 'N':
+				{
+					// Create bounding rectangle
+					struct bound_s rect = {grp.x, grp.y, grp.wid, grp.hei, 0, 0};
+					getmaxyx(grp.win, rect.rows, rect.columns);
+					
+					for(equat_t eq1 = gallery; eq1; eq1 = eq1->next) if(!(eq1->is_variable) && eq1->right){
+						for(equat_t eq2 = eq1->next; eq2; eq2 = eq2->next) if(!(eq2->is_variable) && eq2->right){
+							append_inters(
+								&intersections, rect,
+								eval_equat, eq1,
+								eval_equat, eq2,
+								30, 0.000001
+							);
+						}
+					}
+				}
+				break;
+				case 'c': // Clear list of intersections
+				case 'C':
+					free_inters(intersections);
+					intersections = NULL;
+				break;
+				case '.': // Move to Next Intersection
+				case '>':
+					if(intersections){
+						intersections = intersections->next;
+					}
+				break;
+				case ',': // Move to Previous Intersection
+				case '<':
+					if(intersections){
+						intersections = intersections->prev;
+					}
 				break;
 				
 				// Switch focus to textboxes in gallery
@@ -287,6 +354,12 @@ int main(int argc, char *argv[]){
 							gallery = gcurs->next;
 							if(gcurs->next) gcurs->next->prev = NULL;
 						}
+						
+						// Remove intersections attached to equation
+						bool remd;
+						do{
+							remd = remove_inter(&intersections, eval_equat, gcurs);
+						}while(remd);
 						
 						if(!(gcurs->is_variable) && gcurs->left) free(gcurs->left);
 						if(gcurs->right) free(gcurs->right);

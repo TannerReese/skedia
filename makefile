@@ -1,11 +1,14 @@
 CC=gcc
 flags=
 
-skedia: skedia.o graph.o gallery.o expr.o expr_builtins.o
-	$(CC) $(flags) -o skedia skedia.o graph.o gallery.o expr.o expr_builtins.o -lcurses -lm
+skedia: skedia.o graph.o gallery.o intersect.o expr.o expr_builtins.o
+	$(CC) $(flags) -o skedia skedia.o graph.o gallery.o intersect.o expr.o expr_builtins.o -lcurses -lm
 
 skedia.o: skedia.c
 	$(CC) $(flags) -c skedia.c
+
+intersect.o: intersect.c intersect.h
+	$(CC) $(flags) -c intersect.c
 
 gallery.o: gallery.c gallery.h
 	$(CC) $(flags) -c gallery.c
