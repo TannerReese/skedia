@@ -39,11 +39,14 @@ typedef struct inter_s{
  *   // With grid points at (-1, -1), (-1, 1), (1, -1), (1, 1)
  *   
  *   point_t pt1, pt2;
- *   // Half the initial bounding area of crossing 3 times
- *   pt1 = curve_inters(rect, 3, f1, prm1, f2, prm2);
- *   // Half the initial bounding area of crossing 4 times
- *   pt2 = curve_inters(rect, 4, NULL, NULL, NULL, NULL);  // rect need not be provided for later calls
- * 
+ *   bool succ = 0;
+ *   // Halve the initial bounding area of crossing 3 times
+ *   pt1 = curve_inters(rect, f1, prm1, f2, prm2, 3, &succ);
+ *   // If succ == 1 then pt1 is an intersect
+ *   
+ *   // Halve the initial bounding area of crossing 4 times
+ *   pt2 = curve_inters(rect, NULL, NULL, NULL, NULL, 4, &succ);  // the data in rect is not used for later calls
+ *   
  * Arguments:
  *   struct bound_s rect : Bounding area in which to search for crossings
  *   int depth : Number of times to halve the bounding area once a crossing is found

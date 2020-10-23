@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <math.h>
 
@@ -18,7 +19,10 @@
 // Linked list of equations representing the gallery and a pointer to the cursor
 equat_t gallery, gcurs;
 // Circular Linked list of intersections 
-inter_t intersections;
+inter_t intersections = NULL;
+// Indicate that the program should not start ncurses
+// And simply print the calculated intersections
+bool only_intersects = 0;
 
 // Store location and size of graph in terminal and in the plane
 graph_t grp = {NULL, -5, 5, 10, 10};
@@ -31,6 +35,7 @@ struct argp_option options[] = {
 	{"center", 'e', "XPOS,YPOS", 0, "Position of the center of the grid (def: 0,0)"},
 	{"input", 'i', "EQUATION", 0, "Add an equation for a curve"},
 	{"color", 'c', "COLOR", 0, "Set the color of the curve specified before (def: red)"},
+	{"intersects", 'x', 0, 0, "Only calculate and print the intersections of the given curves"},
 	{0}
 };
 struct argp argp = {
@@ -68,6 +73,46 @@ struct argp argp = {
 
 int main(int argc, char *argv[]){
 	argp_parse(&argp, argc, argv, 0, NULL, NULL);
+	
+	// Check for '-x' flag to not start ncurses
+	if(only_intersects){
+		struct bound_s rect = {grp.x, grp.y, grp.wid, grp.hei, 1000, 1000};
+		bool isfst = 1;
+		
+		// Iterate over all pairs of equations
+		for(equat_t eq1 = gallery; eq1; eq1 = eq1->next) if(!(eq1->is_variable) && eq1->right){
+			// Iterate over all equations after eq1
+			for(equat_t eq2 = eq1->next; eq2; eq2 = eq2->next) if(!(eq2->is_variable) && eq2->right){
+				// Find intersections and store them in intersections
+				append_inters(
+					&intersections, rect,
+					eval_equat, eq1,
+					eval_equat, eq2,
+					30, (grp.wid < grp.hei ? grp.wid : grp.hei) / 10000
+				);
+				
+				// If no intersections found move to next curve pair
+				if(!intersections) continue;
+				
+				// Print Header for intersections between these curves
+				printf("%s%s  &  %s\n", isfst ? "" : "\n", eq1->text, eq2->text);
+				isfst = 0;
+				
+				inter_t inr = intersections;
+				do{
+					// Print each intersection
+					printf("( %.17lf , %.17lf )\n", inr->x, inr->y);
+					
+					inr = inr->next;
+				}while(inr != intersections);
+				
+				// Empty out intersection list for next pair
+				free_inters(intersections);
+				intersections = NULL;
+			}
+		}
+		return 1;
+	}
 	
 	// Place gallery cursor at beginning
 	gcurs = gallery;
@@ -152,6 +197,7 @@ int main(int argc, char *argv[]){
 			wrefresh(galwin);
 		}
 		
+		// Parse User Keystrokes
 		update_gallery = 0;
 		update_graph = 0;
 		c = getch();
@@ -211,7 +257,9 @@ int main(int argc, char *argv[]){
 					struct bound_s rect = {grp.x, grp.y, grp.wid, grp.hei, 0, 0};
 					getmaxyx(grp.win, rect.rows, rect.columns);
 					
+					// Iterate over all equations
 					for(equat_t eq1 = gallery; eq1; eq1 = eq1->next) if(!(eq1->is_variable) && eq1->right){
+						// Iterate over all equations after eq1
 						for(equat_t eq2 = eq1->next; eq2; eq2 = eq2->next) if(!(eq2->is_variable) && eq2->right){
 							append_inters(
 								&intersections, rect,
@@ -436,8 +484,10 @@ error_t parse_opt(int key, char *arg, struct argp_state *state){
 				setdims_graph(&grp, grp.wid, y);
 			}else argp_usage(state);
 		break;
+		// Window center
 		case 'e':
 			if(sscanf(arg, "%lf,%lf", &x, &y) != EOF){
+				// Set upper left corner of graph
 				grp.x = x - grp.wid / 2;
 				grp.y = y + grp.hei / 2;
 			}else argp_usage(state);
@@ -482,6 +532,8 @@ error_t parse_opt(int key, char *arg, struct argp_state *state){
 				argp_usage(state);
 				break;
 			}
+		break;
+		case 'x': only_intersects = 1;
 		break;
 		default: return ARGP_ERR_UNKNOWN;
 	}
