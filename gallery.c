@@ -77,12 +77,14 @@ void draw_gallery(WINDOW *win, equat_t top, bool show_curs){
 	int x, y, i = 0;
 	// i represents the index of the textbox
 	char *s;
+	// Iterate over equations and display each
 	for(equat_t eq = top; eq; eq = eq->next){
 		// Indicate if highlight should be drawn in textbox
 		bool do_highlight = i == 0 && show_curs;
 		
 		x = 1;
 		y = i * (TEXTBOX_HEIGHT + 1) + 1;
+		// Iterate over characters in text of equation `eq`
 		for(s = eq->text; *s != '\0' || eq->curs == s && do_highlight; s++){
 			if(s == eq->curs && do_highlight){
 				wattron(win, COLOR_PAIR(INVERT_PAIR));
@@ -101,6 +103,7 @@ void draw_gallery(WINDOW *win, equat_t top, bool show_curs){
 			if(y >= hei - 1 || y >= i * (TEXTBOX_HEIGHT + 1) + TEXTBOX_HEIGHT - 1) break;
 		}
 		
+		// Draw color picker
 		y = i * (TEXTBOX_HEIGHT + 1) + TEXTBOX_HEIGHT;
 		if(y < hei - 1){
 			if(eq->err == ERR_OK){
@@ -116,7 +119,7 @@ void draw_gallery(WINDOW *win, equat_t top, bool show_curs){
 				}
 			}else{
 				// Display parse error instead of color picker if there was one
-				char buf[wid - 1]; // Create buffer to store and potentially truncate error message
+				char buf[wid]; // Create buffer to store and potentially truncate error message
 				buf[0] = '\0';
 				strncat(buf, parse_errstr[eq->err], wid - 1);
 				if(i == 0 && !(eq->curs) && show_curs){
@@ -132,7 +135,7 @@ void draw_gallery(WINDOW *win, equat_t top, bool show_curs){
 		y++;
 		
 		// Draw divider between textboxes
-		for(x = 1; x < hei - 1; x++){
+		for(x = 1; x < wid - 1; x++){
 			mvwaddch(win, y, x, '*');
 		}
 		
@@ -331,6 +334,7 @@ parse_err_t parse_equat(equat_t gallery, equat_t eq){
 	return ERR_OK;
 }
 
+// Create and Add equation to gallery and Return it
 equat_t add_equat(equat_t *gallery, const char *text){
 	// Seek to end of gallery to append equation
 	equat_t prev = NULL, *new;
@@ -339,8 +343,8 @@ equat_t add_equat(equat_t *gallery, const char *text){
 	}
 	*new = malloc(sizeof(struct equat_s));
 	// Place text into the textbox of the equation
-	(*new)->text[0] = '\0';
-	strncat((*new)->text, text, TEXTBOX_SIZE);
+	memset((*new)->text, '\0', TEXTBOX_SIZE * sizeof(char));  // Clear out any stale data
+	strncat((*new)->text, text, TEXTBOX_SIZE - 1);
 	
 	// Clear all union values
 	(*new)->name = NULL;
@@ -350,6 +354,7 @@ equat_t add_equat(equat_t *gallery, const char *text){
 	
 	(*new)->is_variable = 0; // Default to proper equation
 	(*new)->curs = (*new)->text;
+	(*new)->err = ERR_OK;
 	
 	// Ensure that left and right are null to prevent parse_equat from accidentally freeing unallocated space
 	(*new)->right = NULL;

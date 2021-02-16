@@ -12,6 +12,7 @@
 #include "intersect.h"
 #include "expr.h"
 
+// Identify shifted keys
 #define KEY_SUP 0521
 #define KEY_SDOWN 0520
 
@@ -114,6 +115,8 @@ int main(int argc, char *argv[]){
 		return 1;
 	}
 	
+	
+	
 	// Place gallery cursor at beginning
 	gcurs = gallery;
 	
@@ -146,13 +149,36 @@ int main(int argc, char *argv[]){
 	grp.win = newwin(0, 0, 0, GALLERY_WIDTH + 1);
 	WINDOW *galwin = newwin(0, GALLERY_WIDTH, 0, 0);
 	
+
+	// Main Loop
+	// ---------------------
 	int c;
 	bool running = 1;
 	// Determine whether the gallery and graph should be redrawn
 	bool update_gallery = 1, update_graph = 1;
+	// Variables for tracking terminal resizes
+	int scrwid, scrhei, new_scrwid, new_scrhei;
+	getmaxyx(stdscr, scrwid, scrhei);
 	// Indicate whether key strokes are sent to the graph or the gallery
 	bool focus_on_graph = 1;
 	while(running){
+		// Check if terminal dimensions to resize `galwin` and `grp.win` appropriately
+		getmaxyx(stdscr, new_scrhei, new_scrwid);
+		if(new_scrhei != scrhei || new_scrwid != scrwid){
+			scrhei = new_scrhei;
+			scrwid = new_scrwid;
+			
+			wresize(grp.win, scrhei, scrwid - GALLERY_WIDTH);
+			wresize(galwin, scrhei, GALLERY_WIDTH);
+			
+			// On Resize both Graph and Gallery need to be redrawn
+			update_graph = 1;
+			update_gallery = 1;
+		}
+		
+		
+		// Graph Redrawing
+		// --------------------------
 		if(update_graph){
 			// Draw graph
 			wclear(grp.win);  // Clear graph window
@@ -190,6 +216,9 @@ int main(int argc, char *argv[]){
 			wrefresh(grp.win);
 		}
 		
+		
+		// Draw Gallery
+		// -----------------------
 		if(update_gallery){
 			// Draw gallery
 			wclear(galwin);
@@ -197,14 +226,18 @@ int main(int argc, char *argv[]){
 			wrefresh(galwin);
 		}
 		
-		// Parse User Keystrokes
+		
+		
+		// Parse User Input
+		// ------------------------
 		update_gallery = 0;
 		update_graph = 0;
 		c = getch();
 		if(c == (int)('C' & 0x1f) || c == (int)('Z' & 0x1f)){ // Check for Control-C or Control-Z
 			running = 0;
 		}else if(focus_on_graph){
-			// Controls when focus is on graph
+			// Graph Controls
+			// -------------------------------
 			
 			// Graph needs to be redrawn after movement or zoom
 			update_graph = 1;
@@ -298,7 +331,8 @@ int main(int argc, char *argv[]){
 				break;
 			}
 		}else{
-			// Controls when in textbox
+			// Gallery Controls
+			// --------------------------------------
 			
 			// Gallery needs to be redrawn after movement or change
 			update_gallery = 1;
@@ -360,6 +394,7 @@ int main(int argc, char *argv[]){
 					case 0x7f:
 					case '\b': // Backspace
 						if(gcurs->curs && gcurs->curs > gcurs->text){
+							// Move through text copying characters backwards
 							for(char *s = gcurs->curs - 1; *s != '\0' && s < gcurs->text + TEXTBOX_SIZE - 1; s++){
 								*s = *(s + 1);
 							}
