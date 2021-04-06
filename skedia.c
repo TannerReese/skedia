@@ -3,14 +3,16 @@
 #include <stdbool.h>
 #include <string.h>
 #include <math.h>
+#include <ctype.h> // For int isprint(int c)
 
 #include <ncurses.h>
-#include <argp.h>
 
 #include "graph.h"
 #include "gallery.h"
 #include "intersect.h"
 #include "expr.h"
+
+#include "args.h"
 
 // Identify shifted keys
 #define KEY_SUP 0521
@@ -18,65 +20,24 @@
 
 
 // Linked list of equations representing the gallery and a pointer to the cursor
-equat_t gallery, gcurs;
+equat_t gallery = NULL, gcurs = NULL;
 // Circular Linked list of intersections 
 inter_t intersections = NULL;
-// Indicate that the program should not start ncurses
-// And simply print the calculated intersections
-bool only_intersects = 0;
 
 // Store location and size of graph in terminal and in the plane
 graph_t grp = {NULL, -5, 5, 10, 10};
 
-error_t parse_opt(int key, char *arg, struct argp_state *state);
-
-struct argp_option options[] = {
-	{"width", 'w', "UNITS", 0, "Width of grid as float (def: 10)"},
-	{"height", 'h', "UNITS", 0, "Height of grid as float (def: 10)"},
-	{"center", 'e', "XPOS,YPOS", 0, "Position of the center of the grid (def: 0,0)"},
-	{"input", 'i', "EQUATION", 0, "Add an equation for a curve"},
-	{"color", 'c', "COLOR", 0, "Set the color of the curve specified before (def: red)"},
-	{"intersects", 'x', 0, 0, "Only calculate and print the intersections of the given curves"},
-	{0}
-};
-struct argp argp = {
-	options, parse_opt, "-i EQUATION1 [-c COLOR1] [-i EQUATION2 [-c COLOR2] ...",
-	// Documentation String
-	"Graph curves and functions\v"
-	"Colors are designated as red: r, green: g, blue: b, cyan: c, yellow: y, or magenta: m\n"
-	"\nGraph Mode Keys:\n"
-	"    Arrows / hjkl - Move graph\n"
-	"    Shift Arrows / HJKL - Resize horizontally and vertically\n"
-	"    '=' - Zoom In\n"
-	"    '-' - Zoom Out\n"
-	"    '0' - Return to default Zoom Level\n"
-	"    n or N - Find Intersections between curves\n"
-	"    c or C - Clear all Intersections\n"
-	"    , or < - Move to prior Intersection\n"
-	"    . or > - Move to next Intersection\n"
-	"    Control-A (^A) - Switch to Gallery Mode and Create new textbox\n"
-	"    g or G - Switch to Gallery Mode\n"
-	"    Control-C (^C) or Control-Z (^Z) or q or Q - Exit\n"
-	"\nGallery Mode Keys:\n"
-	"    Left & Right Arrows - Move within textbox or change color\n"
-	"    Up & Down Arrows - Move between textboxes and to color picker\n"
-	"    Backspace - Remove character before cursor\n"
-	"    Home - Go to beginning of textbox\n"
-	"    End - Go to end of textbox\n"
-	"    Control-A (^A) - Create new textbox at bottom of gallery\n"
-	"    Control-D (^D) - Delete currently selected textbox and equation\n"
-	"    Esc - Switch to Graph Mode\n"
-	"    Control-C (^C) or Control-Z (^Z) - Exit\n"
-	"\nAvailable builtin functions include sqrt, cbrt, exp, ln, log10, sin, cos, tan, sec, csc, cot, sinh, cosh, tanh, asin, acos, atan, atan2, abs, ceil, and floor\n"
-	"\n"
-};
 
 
 int main(int argc, char *argv[]){
-	argp_parse(&argp, argc, argv, 0, NULL, NULL);
+	struct args_s args = {0, &grp, &gallery};
+	parse_args(&args, argc, argv);
 	
+	
+	// Intersection Calculation
+	// ---------------------
 	// Check for '-x' flag to not start ncurses
-	if(only_intersects){
+	if(args.only_intersects){
 		struct bound_s rect = {grp.x, grp.y, grp.wid, grp.hei, 1000, 1000};
 		bool isfst = 1;
 		
@@ -495,83 +456,6 @@ int main(int argc, char *argv[]){
 	
 	delwin(grp.win);
 	endwin();
-	return 0;
-}
-
-
-
-
-
-
-// Argp parse function
-error_t parse_opt(int key, char *arg, struct argp_state *state){
-	double x, y;
-	equat_t tmp;
-	switch(key){
-		// Get window location and dimensions
-		case 'w':
-			if(sscanf(arg, "%lf", &x)){
-				setdims_graph(&grp, x, grp.hei);
-			}else argp_usage(state);
-		break;
-		case 'h':
-			if(sscanf(arg, "%lf", &y)){
-				setdims_graph(&grp, grp.wid, y);
-			}else argp_usage(state);
-		break;
-		// Window center
-		case 'e':
-			if(sscanf(arg, "%lf,%lf", &x, &y) != EOF){
-				// Set upper left corner of graph
-				grp.x = x - grp.wid / 2;
-				grp.y = y + grp.hei / 2;
-			}else argp_usage(state);
-		break;
-		
-		case 'c':
-			if(strlen(arg) > 1) break;
-			
-			// If there are no equalities no colors may be specified
-			if(!gallery) break;
-			
-			// Get last equation / textbox in gallery
-			for(tmp = gallery; tmp->next; tmp = tmp->next){}
-			switch(arg[0]){
-				case 'r': tmp->color_pair = 1;
-				break;
-				case 'g': tmp->color_pair = 2;
-				break;
-				case 'b': tmp->color_pair = 3;
-				break;
-				case 'c': tmp->color_pair = 4;
-				break;
-				case 'y': tmp->color_pair = 5;
-				break;
-				case 'm': tmp->color_pair = 6;
-				break;
-			}
-		break;
-		case 'i':
-			// Create new equation at the end of the gallery
-			tmp = add_equat(&gallery, arg);
-			
-			// Parse text and check for errors
-			if(parse_equat(gallery, tmp) != ERR_OK){
-				// If there is an error while parsing return it
-				fprintf(stderr, "Error %s while reading equation: %s\n", parse_errstr[(tmp)->err], arg);
-				// If expressions were created during parsing deallocate them
-				if(!(tmp->is_variable) && tmp->left) free_expr(tmp->left);
-				if(tmp->right) free_expr(tmp->right);
-				free(tmp);
-				
-				argp_usage(state);
-				break;
-			}
-		break;
-		case 'x': only_intersects = 1;
-		break;
-		default: return ARGP_ERR_UNKNOWN;
-	}
 	return 0;
 }
 
