@@ -41,7 +41,7 @@ clean:
 
 
 # Man Page compilation
-docs: skedia.pdf skedia.html
+docs: skedia.pdf skedia.html skedia.1.gz
 
 skedia.pdf: skedia.man
 	groff -mandoc -Tpdf skedia.man > skedia.pdf
@@ -49,7 +49,11 @@ skedia.pdf: skedia.man
 skedia.html: skedia.man
 	groff -mandoc -Thtml skedia.man > skedia.html
 
+# Compressed Manpage to put in /usr/share/man/man1
+skedia.1.gz: skedia.man
+	gzip -9c skedia.man > skedia.1.gz
+
 # Remove documentation files
 clean-docs:
-	rm -f skedia.pdf skedia.html
+	rm -f skedia.pdf skedia.html skedia.1.gz
 

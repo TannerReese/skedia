@@ -4,6 +4,7 @@ skedia
 # Compiled Documentation
 *.pdf
 *.html
+*.1.gz
 
 # Vim Swap Files
 *.sw*
