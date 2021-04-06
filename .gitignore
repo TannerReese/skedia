@@ -1,6 +1,10 @@
 # Build
 skedia
 
+# Compiled Documentation
+*.pdf
+*.html
+
 # Vim Swap Files
 *.sw*
 

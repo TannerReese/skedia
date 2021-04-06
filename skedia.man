@@ -1,0 +1,194 @@
+.TH skedia 1 "16 Feb 20"
+.SH NAME
+skedia \- Graph functions and implicit curves in the terminal
+
+
+.SH SYNOPSIS
+.B skedia
+[ \-? | \-\-help | \-\-usage ]
+[ \-e \fIXPOS,YPOS\fP ]
+[ \-w \fIWIDTH\fP ] [\-h \fIHEIGHT\fP ]
+[ \-x | \-\-intersects]
+[\-i \fIEQU1\fP [ \-c \fICOL1\fP ]
+[ \-i \fIEQU2\fP [ \-c \fICOL2\fP ] ... ]]
+
+
+.SH DESCRIPTION
+Skedia is a ncurses-based 2D graph viewer.
+It supports the definition of implicit curves using builtin math functions
+as well as user\-defined variables and functions.
+It allows dilations and translations of the plane to navigate the curves.
+It also supports calculation of the intersection points of curves.
+
+
+.SH OPTIONS
+
+.TP
+.B \-i, \-\-input=\fIEQUATION\fP
+The equation(s) for the curves as well as
+user\-defined variables and functions.
+May be specified on command line
+or while the program is running.
+
+.TP
+.B \-c, \-\-color=\fICOLOR\fP
+Set color of associated equation.
+Possible colors are
+red (\fBr\fP), green (\fBg\fP), blue (\fBb\fP),
+cyan(\fBc\fP), yellow(\fBy\fP), or magenta (\fBm\fP)
+Defaults to red.
+
+.TP
+.B \-e, \-\-center=\fIX,Y\fP
+Set the initial center of the plane.
+Defaults to the origin, (0, 0).
+
+.TP
+.B \-w, \-\-width=\fIUNITS\fP \t \-h, \-\-height=\fIUNITS\fP
+Specify the size of the graph in the plane in units.
+Defaults to 10 by 10 which displays
+the \fBx\fP values from -5 to 5
+and the \fBy\fP values from -5 to 5.
+
+.TP
+.B \-x, \-\-intersects
+Only calculate and print the intersections
+of the curves given with \fB-i\fP or \fB--input\fP. \fIncurses\fP is not started and
+the color (\fB-c\fP), width (\fB-w\fP), height (\fB-h\fP), and center (\fB-e\fP) values are not used.
+
+.TP
+.B \-?, \-\-help
+Show help message including program controls
+
+.TP
+.B \-\-usage
+Show usage message for command line arguments
+
+
+.SH CONTROLS
+
+The controls for \fIskedia\fP change depending on the mode the program is in.
+When in Graph Mode, keystrokes will affect
+the graph containing the curves and grid on the right side of the screen.
+When in Gallery Mode, the keystrokes will affect
+the gallery containing the equations on the left side of the screen.
+
+GRAPH MODE
+.RS
+
+.TP
+.B Arrow Keys / hjkl
+Move Graph.
+
+.TP
+.B Shift + Arrow Keys / HJKL
+Resize horizontally and vertically.
+Shift left zooms in horizontally.
+Shift right zooms out horizontally.
+Shift up zooms in vertically.
+Shift down zooms out vertically.
+
+.TP
+.B '=' key
+Zoom In keeping the center fixed.
+
+.TP
+.B '-' key
+Zoom Out keeping the center fixed.
+
+.TP
+.B '0' key
+Return to default Zoom level.
+Set width to 10 units and height to 10 units.
+
+.TP
+.B 'n' or 'N'
+Calculate / Recalculate Intersection points
+within visible window between curves.
+
+.TP
+.B 'c' or 'C'
+Clear all calculated intersection points.
+
+.TP
+.B ',' or '<'
+Select prior intersection point among all intersections.
+
+.TP
+.B '.' or '>'
+Select next intersection point among all intersections.
+
+.TP
+.B Control-A (^A)
+Switch to gallery mode and create new textbox for equation.
+
+.TP
+.B Control-C (^C) or Control (^Z) or 'q' or 'Q'
+Quit program.
+
+.RE
+
+GALLERY MODE
+.RS
+
+.TP
+.B Left & Right Arrow Keys
+When in textbox, moves between characters.
+When on color picker, changes color.
+
+.TP
+.B Up & Down Arrow Keys
+Move to color picker for textbox or between textboxes.
+
+.TP
+.B Backspace Key
+Removes character before cursor.
+
+.TP
+.B Home Key
+Moves cursor to the beginning of the current textbox.
+
+.TP
+.B End Key
+Move cursor to the end of the current textbox.
+
+.TP
+.B Control-A (^A)
+Switch to gallery mode and create new textbox for equation.
+
+.TP
+.B Control-D (^D)
+Delete currently selected textbox and equation.
+Moves textbox selection to the first textbox in the gallery.
+
+.TP
+.B Escape Key
+Switch to Graph Mode.
+
+.TP
+.B Control-C (^C) or Control (^Z)
+Quit program.
+
+.RE
+
+
+.SH FUNCTIONS
+\fIskedia\fP supports the builtin functions provided by math.h
+.P
+The trigonometric functions: \fBsin\fP, \fBcos\fP, \fBtan\fP, \fBsec\fP, \fBcsc\fP, and \fBcot\fP.
+.P
+The inverse trigonometric functions: \fBasin\fP, \fBacos\fP, \fBatan\fP, and \fBatan2\fP.
+.P
+The hyperbolic trigonometric functions: \fBsinh\fP, \fBcosh\fP, and \fBtanh\fP.
+.P
+Exponentiation and logrithms: \fBexp\fP, \fBln\fP, and \fBlog10\fP.
+.P
+Roots: \fBsqrt\fP and \fBcbrt\fP.
+.P
+Integer rectification and magnitude: \fBabs\fP, \fBceil\fP, and \fBfloor\fP.
+
+
+.SH AUTHOR
+.IP
+Tanner Reese <tannerjamesreese@gmail.com>.
+
