@@ -499,9 +499,9 @@ static struct token_s lex_expr(const char **str, parse_err_t *err){
 
 typedef struct{
 	struct expr_s *head, *tail, *ptr;
-} stack_t;
+} expr_stack_t;
 
-static struct expr_s pop_null(stack_t *s){
+static struct expr_s pop_null(expr_stack_t *s){
 	struct expr_s exp = {0};
 	// Check if stack is empty
 	if(!(s->ptr)) return exp;
@@ -518,7 +518,7 @@ static struct expr_s pop_null(stack_t *s){
 }
 
 // Pop off last element as long as it isn't a null expression
-static struct expr_s pop(stack_t *s){
+static struct expr_s pop(expr_stack_t *s){
 	// Check if ptr is at a null expression, a block
 	if(s->ptr->type == EXPR_PARENTH) return *(s->ptr);
 	return pop_null(s);
@@ -526,12 +526,12 @@ static struct expr_s pop(stack_t *s){
 
 #define peek_null(s) ((s)->ptr)
 
-static struct expr_s *peek(stack_t *s){
+static struct expr_s *peek(expr_stack_t *s){
 	if(!(s->ptr)) return NULL;
 	return s->ptr->type == EXPR_PARENTH ? NULL : s->ptr;
 }
 
-static struct expr_s *push(stack_t *s, struct expr_s exp){
+static struct expr_s *push(expr_stack_t *s, struct expr_s exp){
 	// Check if space available
 	if(s->ptr == s->tail) return NULL;
 	
@@ -549,7 +549,7 @@ static struct expr_s *push(stack_t *s, struct expr_s exp){
 
 // Applies operator node `op` to the values on the value stack
 // Pops elements off the value stack and combines them according to the operator
-static parse_err_t apply_op(stack_t *s, struct expr_s op){
+static parse_err_t apply_op(expr_stack_t *s, struct expr_s op){
 	struct expr_s tmp, tmp2;
 	expr_t tmp_p;
 	int cnt;
@@ -746,7 +746,7 @@ expr_t parse_expr(const char *src, name_trans_f callback, const char **endptr, p
 	}
 	
 	// Initialize value and operator stack
-	stack_t vals, ops;
+	expr_stack_t vals, ops;
 	struct expr_s val_stack[PARSE_STACK_SIZE], op_stack[PARSE_STACK_SIZE];
 	vals.head = val_stack;
 	vals.tail = val_stack + PARSE_STACK_SIZE;
