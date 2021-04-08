@@ -106,6 +106,12 @@ double eval_expr(expr_t exp, double *args){
 	
 	double result;
 	switch(exp->type){
+		// Used during parsing
+		// But won't occur as types of actual nodes
+		case EXPR_PARENTH:
+		case EXPR_COMMA:
+		break;
+		
 		case EXPR_CONST: result = exp->constant;
 		break;
 		case EXPR_ARGS: result = args[exp->arg_ind];
@@ -211,6 +217,12 @@ bool expr_match(expr_t exp, expr_t target){
 			case EXPR_MUL:
 			case EXPR_POW:
 			return 1;
+			
+			// Used during parsing
+			// But won't occur as types of actual nodes
+			case EXPR_PARENTH:
+			case EXPR_COMMA:
+			break;
 		}
 	}
 	
@@ -366,6 +378,17 @@ expr_t pow_expr(expr_t res, expr_t a, expr_t b){
 
 
 
+// Redefinition and Reimplementation to avoid dependence on novel library functions
+size_t expr_strnlen(const char *s, size_t max){
+	size_t n;
+	for(n = 0; n < max && *s; s++, n++);
+	return n;
+}
+
+
+
+
+
 // Allow for conversion from enum to string when printing error
 const char *parse_errstr[] = {
 	"ERR_OK",
@@ -479,7 +502,7 @@ typedef struct{
 } stack_t;
 
 static struct expr_s pop_null(stack_t *s){
-	struct expr_s exp;
+	struct expr_s exp = {0};
 	// Check if stack is empty
 	if(!(s->ptr)) return exp;
 	
@@ -524,6 +547,8 @@ static struct expr_s *push(stack_t *s, struct expr_s exp){
 	return s->ptr;
 }
 
+// Applies operator node `op` to the values on the value stack
+// Pops elements off the value stack and combines them according to the operator
 static parse_err_t apply_op(stack_t *s, struct expr_s op){
 	struct expr_s tmp, tmp2;
 	expr_t tmp_p;
@@ -552,6 +577,8 @@ static parse_err_t apply_op(stack_t *s, struct expr_s op){
 			push(s, op);
 		break;
 		
+		// Accumulate terms for function call
+		// Tries to add top element from stack to second to top element
 		case EXPR_COMMA:
 			if(!peek(s)) return ERR_MISSING_VALUE;
 			tmp2 = pop(s);
@@ -566,6 +593,7 @@ static parse_err_t apply_op(stack_t *s, struct expr_s op){
 			*(tmp_p->next) = tmp2;
 		break;
 		
+		// Add or Multiply top two elements
 		case EXPR_ADD:
 		case EXPR_MUL:
 			if(!peek(s)) return ERR_MISSING_VALUE;
@@ -666,6 +694,13 @@ static parse_err_t apply_op(stack_t *s, struct expr_s op){
 			op.child_count = 2;
 			push(s, op);
 		break;
+		
+		// Following types can never occur as the type of an operator
+		case EXPR_CONST:
+		case EXPR_ARGS:
+		case EXPR_CACHED:
+		case EXPR_PARENTH:
+		break;
 	}
 	
 	return ERR_OK;
@@ -720,8 +755,7 @@ expr_t parse_expr(const char *src, name_trans_f callback, const char **endptr, p
 	ops.tail = op_stack + PARSE_STACK_SIZE;
 	ops.ptr = NULL;
 	
-	struct expr_s tmp, op_tmp;
-	expr_t tmp_p;
+	struct expr_s tmp;
 	int prec1, prec2;
 	for(struct token_s tok = lex_expr(endptr, err);
 		tok.type != END && *err == ERR_OK;
@@ -745,7 +779,7 @@ expr_t parse_expr(const char *src, name_trans_f callback, const char **endptr, p
 				
 				// Check builtin functions
 				for(int i = 0; expr_builtin_funcs[i].name[0] != '\0'; i++){
-					if(strnlen(expr_builtin_funcs[i].name, EXPR_FUNCNAME_LEN) == tok.length
+					if(expr_strnlen(expr_builtin_funcs[i].name, EXPR_FUNCNAME_LEN) == tok.length
 					&& strncasecmp(tok.name, expr_builtin_funcs[i].name, tok.length) == 0
 					){
 						tmp.child_count = expr_builtin_funcs[i].arity;
@@ -785,8 +819,8 @@ expr_t parse_expr(const char *src, name_trans_f callback, const char **endptr, p
 				if(tmp.type == EXPR_CONST
 				|| tmp.type == EXPR_ARGS
 				|| tmp.type == EXPR_CACHED
-				|| (tmp.type == EXPR_VAR || tmp.type == EXPR_FUNCN)
-				   && tmp.child_count == 0
+				|| ((tmp.type == EXPR_VAR || tmp.type == EXPR_FUNCN)
+				   && tmp.child_count == 0)
 				){
 					if(!push(&vals, tmp)) *err = ERR_PARSE_OVERFLOW;
 				}else{
@@ -879,7 +913,7 @@ expr_t parse_expr(const char *src, name_trans_f callback, const char **endptr, p
 				prec2 = get_prec(peek(&ops));
 				while( prec2 >= 0
 				&&   ( prec2 > prec1
-				     ||  prec2 == prec1 && left_associate(peek(&ops))
+				     ||  (prec2 == prec1 && left_associate(peek(&ops)))
 				     )
 				){
 					*err = apply_op(&vals, pop(&ops));
@@ -892,6 +926,10 @@ expr_t parse_expr(const char *src, name_trans_f callback, const char **endptr, p
 				if(!push(&ops, tmp)){
 					*err = ERR_PARSE_OVERFLOW;
 				}
+			break;
+			
+			// Token type filtered out by surrounding for loop
+			case END:
 			break;
 		}
 		

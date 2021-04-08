@@ -370,7 +370,7 @@ int main(int argc, char *argv[]){
 					case KEY_END:
 						// Move cursor to end of text
 						if(gcurs->curs){
-							gcurs->curs = gcurs->text + strnlen(gcurs->text, TEXTBOX_SIZE);
+							gcurs->curs = gcurs->text + expr_strnlen(gcurs->text, TEXTBOX_SIZE);
 						}
 					break;
 					

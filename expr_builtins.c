@@ -46,5 +46,5 @@ expr_builtin_t expr_builtin_funcs[] = {
 	{"abs",   1, 0, {{one_arg: fabs}}},
 	{"ceil",  1, 0, {{one_arg: ceil}}},
 	{"floor", 1, 0, {{one_arg: floor}}},
-	{0}
+	{}
 };

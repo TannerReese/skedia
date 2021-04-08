@@ -85,7 +85,7 @@ void draw_gallery(WINDOW *win, equat_t top, bool show_curs){
 		x = 1;
 		y = i * (TEXTBOX_HEIGHT + 1) + 1;
 		// Iterate over characters in text of equation `eq`
-		for(s = eq->text; *s != '\0' || eq->curs == s && do_highlight; s++){
+		for(s = eq->text; *s != '\0' || (eq->curs == s && do_highlight); s++){
 			if(s == eq->curs && do_highlight){
 				wattron(win, COLOR_PAIR(INVERT_PAIR));
 				// Display '\0' as ' ' when highlighted

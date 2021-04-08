@@ -168,7 +168,7 @@ void draw_curve(graph_t gr, double (*func)(void*, double, double), void *input){
 			acc |= getbit(ispos, i + 1) << 2;
 			acc |= getbit(ispos, i + (th + 1) + 1) << 3;
 			
-			acc = pattern_to_char[acc];
+			acc = pattern_to_char[(int)acc];
 			if(acc != ' ') mvwaddch(gr.win, y, x, acc);
 			
 			i++;
@@ -180,16 +180,14 @@ void draw_curve(graph_t gr, double (*func)(void*, double, double), void *input){
 	}
 }
 
+// Draw function defined by func(x) = y
+// If isx_out = 1 then func(y) = x
 void draw_func(graph_t gr, double (*func)(void*, double), void *input, bool isx_out){
 	int tw, th;
 	getmaxyx(gr.win, th, tw);
 	
-	int win, wout;
-	
-	char acc;
-	double gin, gout;
-	int x, y, top;
-	double gx, gy;
+	int x, y, top;  // Used to track location of curve in columns and lines
+	double gx, gy;  // Used to track location of curve in terms of units
 	if(isx_out){
 		// Function for x in terms of y
 		for(y = 0; y < tw; y++){

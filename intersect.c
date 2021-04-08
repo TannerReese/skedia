@@ -419,7 +419,7 @@ bool remove_inter(inter_t *inters, double (*func)(void*, double, double), void *
 	inter_t inr = *inters;
 	do{
 		// Check if intersection matches the given function and parameters
-		if(inr->func1 == func && inr->param1 == inp || inr->func2 == func && inr->param2 == inp){
+		if((inr->func1 == func && inr->param1 == inp) || (inr->func2 == func && inr->param2 == inp)){
 			// Check if inters needs to be changed
 			if(inr == *inters) *inters = inr->next == inr->prev ? NULL /* When there is only one element */ : inr->prev;
 			

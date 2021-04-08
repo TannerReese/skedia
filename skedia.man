@@ -166,7 +166,7 @@ Moves textbox selection to the first textbox in the gallery.
 Switch to Graph Mode.
 
 .TP
-.B Control-C (^C) or Control (^Z)
+.B Control-C (^C) or Control-Z (^Z)
 Quit program.
 
 .RE

@@ -79,6 +79,9 @@ typedef struct{
 
 extern expr_builtin_t expr_builtin_funcs[];
 
+// Redefinition and Reimplementation to avoid dependence on novel library functions
+size_t expr_strnlen(const char *s, size_t max);
+
 
 
 // Function used to obtain expression value for a name
