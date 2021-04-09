@@ -321,7 +321,7 @@ parse_err_t parse_equat(equat_t gallery, equat_t eq){
 	
 	if(eq->err != ERR_OK){
 		// Left expression successfully parsed and so must be properly deallocated
-		if(eq->left){
+		if(!eq->is_variable && eq->left){
 			free_expr(eq->left);
 			eq->left = NULL;
 		}
