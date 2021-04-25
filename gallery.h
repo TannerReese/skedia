@@ -9,6 +9,7 @@
 
 #define GALLERY_WIDTH 25 // Size of gallery in ncurses
 #define TEXTBOX_SIZE 64
+#define TEXTBOX_HEIGHT 4  // Height of each textbox
 
 /* Represent equation attached to a textbox
  * Forms:
@@ -52,7 +53,8 @@ typedef struct equat_s{
 	};
 	
 	// Indicate location of cursor in text
-	// If curs == NULL then focus on color picker
+	// If curs == text - 1 then focus on color picker
+	// If curs == NULL then don't display cursor
 	char *curs;
 	// Store error code for any parse errors that occur
 	parse_err_t err;

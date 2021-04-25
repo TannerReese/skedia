@@ -19,8 +19,14 @@
 #define KEY_SDOWN 0520
 
 
-// Linked list of equations representing the gallery and a pointer to the cursor
-equat_t gallery = NULL, gcurs = NULL;
+// gallery: Linked list of equations representing the gallery
+// gtop: pointer to the first equation to be shown in the side window
+// gcurs: pointer to the cursor
+equat_t gallery = NULL, gtop = NULL, gcurs = NULL;
+// gcount_vis: Number of textboxes which are fully visible at once in the gallery  (Used for moving gtop)
+// gcurs_idx: How many textboxes below `gtop` is `gcurs`
+int gcount_vis, gcurs_idx;
+
 // Circular Linked list of intersections 
 inter_t intersections = NULL;
 
@@ -78,8 +84,10 @@ int main(int argc, char *argv[]){
 	
 	
 	
-	// Place gallery cursor at beginning
+	// Place gallery cursor and top at beginning
 	gcurs = gallery;
+	gtop = gallery;
+	gcurs_idx = 0;  // gcurs starts at same position as gtop
 	
 	// Initialize Ncurses
 	initscr();
@@ -120,6 +128,10 @@ int main(int argc, char *argv[]){
 	// Variables for tracking terminal resizes
 	int scrwid, scrhei, new_scrwid, new_scrhei;
 	getmaxyx(stdscr, scrwid, scrhei);
+	
+	// Calculate maximum number of textboxes which are simultaneously visible
+	gcount_vis = (scrhei - 2) / (TEXTBOX_HEIGHT + 1);
+	
 	// Indicate whether key strokes are sent to the graph or the gallery
 	bool focus_on_graph = 1;
 	while(running){
@@ -131,6 +143,14 @@ int main(int argc, char *argv[]){
 			
 			wresize(grp.win, scrhei, scrwid - GALLERY_WIDTH);
 			wresize(galwin, scrhei, GALLERY_WIDTH);
+			
+			// Recalculate maximum number of visible textboxes
+			gcount_vis = (scrhei - 2) / (TEXTBOX_HEIGHT + 1);
+			// Move gcurs back to top
+			if(gcurs) gcurs->curs = NULL;  // Hide cursor
+			gcurs = gtop;
+			if(gcurs) gcurs->curs = gcurs->text;
+			gcurs_idx = 0;
 			
 			// On Resize both Graph and Gallery need to be redrawn
 			update_graph = 1;
@@ -183,7 +203,8 @@ int main(int argc, char *argv[]){
 		if(update_gallery){
 			// Draw gallery
 			wclear(galwin);
-			draw_gallery(galwin, gcurs, !focus_on_graph);
+			// Draw equations starting from top 
+			draw_gallery(galwin, gtop, !focus_on_graph);
 			wrefresh(galwin);
 		}
 		
@@ -302,21 +323,42 @@ int main(int argc, char *argv[]){
 			if(gcurs){
 				switch(c){
 					case KEY_DOWN:
-						if(gcurs->curs){
+						if(gcurs->curs >= gcurs->text){
 							// If cursor is in text move it to the color picker
-							gcurs->curs = NULL;
+							gcurs->curs = gcurs->text - 1;
 						}else{
-							if(gcurs->next){
-								// If cursor on color picker move it down to next textbox
+							if(gcurs->next){  // If cursor on color picker & there is a next textbox
+								// Hide cursor in gcurs
+								gcurs->curs = NULL;
+								// Move cursor down to next textbox
 								gcurs = gcurs->next;
+								gcurs->curs = gcurs->text;  // Put cursor in text
+								gcurs_idx++;
+								
+								// Check if gcurs has gone below the visible range
+								if(gcurs_idx >= gcount_vis){
+									// Move gtop down
+									gtop = gtop->next;
+									gcurs_idx--;
+								}
 							}
 						}
 					break;
 					case KEY_UP:
-						if(gcurs->curs){
+						if(gcurs->curs >= gcurs->text){
 							if(gcurs->prev){
+								// Hide cursor in gcurs
+								gcurs->curs = NULL;
 								// If cursor is in text move it to previous textbox
 								gcurs = gcurs->prev;
+								gcurs->curs = gcurs->text - 1;  // Put cursor on color picker
+								gcurs_idx--;
+								
+								// Check if gcurs has gone above the visible range
+								if(gcurs_idx < 0){
+									gtop = gcurs;
+									gcurs_idx = 0;
+								}
 							}
 						}else{
 							// If cursor on color picker move into text
@@ -324,7 +366,7 @@ int main(int argc, char *argv[]){
 						}
 					break;
 					case KEY_RIGHT:
-						if(gcurs->curs){
+						if(gcurs->curs >= gcurs->text){
 							// Move text cursor within selected textbox
 							if(*(gcurs->curs) != '\0' && gcurs->curs < gcurs->text + TEXTBOX_SIZE)
 								gcurs->curs++;
@@ -338,7 +380,7 @@ int main(int argc, char *argv[]){
 						}
 					break;
 					case KEY_LEFT:
-						if(gcurs->curs){
+						if(gcurs->curs >= gcurs->text){
 							if(gcurs->curs > gcurs->text)
 								gcurs->curs--;
 						}else{
@@ -354,7 +396,7 @@ int main(int argc, char *argv[]){
 					case KEY_BACKSPACE:
 					case 0x7f:
 					case '\b': // Backspace
-						if(gcurs->curs && gcurs->curs > gcurs->text){
+						if(gcurs->curs > gcurs->text){
 							// Move through text copying characters backwards
 							for(char *s = gcurs->curs - 1; *s != '\0' && s < gcurs->text + TEXTBOX_SIZE - 1; s++){
 								*s = *(s + 1);
@@ -365,11 +407,11 @@ int main(int argc, char *argv[]){
 					break;
 					case KEY_HOME:
 						// Move cursor to beginning of text
-						if(gcurs->curs) gcurs->curs = gcurs->text;
+						if(gcurs->curs >= gcurs->text) gcurs->curs = gcurs->text;
 					break;
 					case KEY_END:
 						// Move cursor to end of text
-						if(gcurs->curs){
+						if(gcurs->curs >= gcurs->text){
 							gcurs->curs = gcurs->text + expr_strnlen(gcurs->text, TEXTBOX_SIZE);
 						}
 					break;
@@ -379,7 +421,7 @@ int main(int argc, char *argv[]){
 					case '\r':
 					case '\n':
 						// If in textbox parse text
-						if(gcurs->curs){
+						if(gcurs->curs >= gcurs->text){
 							parse_equat(gallery, gcurs);
 							
 							// Update graph to reflect new equation
@@ -405,10 +447,25 @@ int main(int argc, char *argv[]){
 							remd = remove_inter(&intersections, eval_equat, gcurs);
 						}while(remd);
 						
+						// New value of gcurs
+						equat_t ngcurs;
+						if(gcurs->prev){
+							ngcurs = gcurs->prev;
+							gcurs_idx--;
+						}else ngcurs = gallery;
+						
+						// Deallocate memory for equation
 						if(!(gcurs->is_variable) && gcurs->left) free(gcurs->left);
 						if(gcurs->right) free(gcurs->right);
 						free(gcurs);
-						gcurs = gallery;
+						
+						// Move cursor up
+						gcurs = ngcurs;
+						if(gcurs_idx < 0){  // Shift gtop if necessary
+							gtop = gcurs;
+							gcurs_idx = 0;
+						}
+						gcurs->curs = gcurs->text;  // Put cursor in text
 						
 						// Update graph to remove the curve for this equation
 						update_graph = 1;
@@ -444,9 +501,17 @@ int main(int argc, char *argv[]){
 		
 		// Command runs for both modes
 		if(c == (int)('A' & 0x1f)){ // ^A, Ctrl-A
+			if(gcurs) gcurs->curs = NULL;  // Hide old cursor
+			
 			// Create new textbox (not necessary for gcurs != NULL)
 			// Create equation and textbox at end of gallery and move cursor to it
 			gcurs = add_equat(&gallery, "");
+			gtop = gcurs;  // Place created equation as low as possible
+			// Move gtop up until gcurs is just visible or there are no equations left
+			for(gcurs_idx = 0;
+				gcurs_idx < gcount_vis - 1 && gtop->prev;
+				gcurs_idx++, gtop = gtop->prev
+			);
 			
 			// Move focus to gallery to type
 			update_gallery = 1;

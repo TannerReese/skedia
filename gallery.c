@@ -64,8 +64,6 @@ double eval_equat(void *inp, double x, double y){
 
 
 
-// Height of each textbox
-#define TEXTBOX_HEIGHT 4
 // Display linked list of equation to given window
 void draw_gallery(WINDOW *win, equat_t top, bool show_curs){
 	int wid, hei;
@@ -79,14 +77,14 @@ void draw_gallery(WINDOW *win, equat_t top, bool show_curs){
 	char *s;
 	// Iterate over equations and display each
 	for(equat_t eq = top; eq; eq = eq->next){
-		// Indicate if highlight should be drawn in textbox
-		bool do_highlight = i == 0 && show_curs;
-		
 		x = 1;
 		y = i * (TEXTBOX_HEIGHT + 1) + 1;
 		// Iterate over characters in text of equation `eq`
-		for(s = eq->text; *s != '\0' || (eq->curs == s && do_highlight); s++){
-			if(s == eq->curs && do_highlight){
+		for(s = eq->text; *s != '\0' || (eq->curs == s && show_curs); s++){
+			// Check to see if character is out of bounds
+			if(y >= hei - 1 || y >= i * (TEXTBOX_HEIGHT + 1) + TEXTBOX_HEIGHT - 1) break;
+			
+			if(s == eq->curs && show_curs){
 				wattron(win, COLOR_PAIR(INVERT_PAIR));
 				// Display '\0' as ' ' when highlighted
 				mvwaddch(win, y, x, *s == '\0' ? ' ' : *s);
@@ -100,7 +98,6 @@ void draw_gallery(WINDOW *win, equat_t top, bool show_curs){
 				x = 1;
 				y++;
 			}
-			if(y >= hei - 1 || y >= i * (TEXTBOX_HEIGHT + 1) + TEXTBOX_HEIGHT - 1) break;
 		}
 		
 		// Draw color picker
@@ -111,11 +108,11 @@ void draw_gallery(WINDOW *win, equat_t top, bool show_curs){
 					// Draw color picker bar at bottom
 					
 					// Use inverted color pair to indicate selection
-					wattron(win, COLOR_PAIR(eq->color_pair | (i == 0 && !(eq->curs) && show_curs ? INVERT_PAIR : 0) ));
+					wattron(win, COLOR_PAIR(eq->color_pair | ((eq->curs == eq->text - 1) && show_curs ? INVERT_PAIR : 0) ));
 					for(x = 1; x < wid - 1; x++){
 						mvwaddch(win, y, x, '-');
 					}
-					wattroff(win, COLOR_PAIR(eq->color_pair | (i == 0 && !(eq->curs) && show_curs ? INVERT_PAIR : 0)));
+					wattroff(win, COLOR_PAIR(eq->color_pair | ((eq->curs == eq->text - 1) && show_curs ? INVERT_PAIR : 0)));
 				}
 			}else{
 				// Display parse error instead of color picker if there was one
