@@ -501,6 +501,8 @@ typedef struct{
 	struct expr_s *head, *tail, *ptr;
 } expr_stack_t;
 
+// Pop off top element from stack
+// Or return zero expression if empty
 static struct expr_s pop_null(expr_stack_t *s){
 	struct expr_s exp = {0};
 	// Check if stack is empty
@@ -518,19 +520,31 @@ static struct expr_s pop_null(expr_stack_t *s){
 }
 
 // Pop off last element as long as it isn't a null expression
+// But don't remove parenthesis
 static struct expr_s pop(expr_stack_t *s){
 	// Check if ptr is at a null expression, a block
 	if(s->ptr->type == EXPR_PARENTH) return *(s->ptr);
 	return pop_null(s);
 }
 
-#define peek_null(s) ((s)->ptr)
+// Check if there is a top value on the stack
+// And that it has the given type
+static int has_top(expr_stack_t *s, enum expr_type tp){
+	// When stack is empty
+	if(!(s->ptr)) return 0;
+	
+	// Return whether top value has given type
+	return s->ptr->type == tp;
+}
 
+// Return pointer to top value on stack
+// Treating parenthesis token as bottom of stack
 static struct expr_s *peek(expr_stack_t *s){
 	if(!(s->ptr)) return NULL;
 	return s->ptr->type == EXPR_PARENTH ? NULL : s->ptr;
 }
 
+// Place expression on the top of the stack
 static struct expr_s *push(expr_stack_t *s, struct expr_s exp){
 	// Check if space available
 	if(s->ptr == s->tail) return NULL;
@@ -855,14 +869,14 @@ expr_t parse_expr(const char *src, name_trans_f callback, const char **endptr, p
 				if(*err != ERR_OK) break;
 				
 				// Check if open parenthesis present
-				if(peek_null(&ops)->type != EXPR_PARENTH){
+				if(!has_top(&ops, EXPR_PARENTH)){
 					*err = ERR_PARENTH_MISMATCH;
 					break;
 				}
 				pop_null(&ops); // Remove open parenthesis block
 				
-				// Esnure that there is a value on vals stack
-				if(peek_null(&vals)->type == EXPR_PARENTH){
+				// Ensure that there is a value on vals stack
+				if(has_top(&vals, EXPR_PARENTH)){
 					*err = ERR_EMPTY_EXPRESSION;
 					break;
 				}
@@ -870,7 +884,7 @@ expr_t parse_expr(const char *src, name_trans_f callback, const char **endptr, p
 				tmp = pop(&vals);
 				
 				// Ensure that there is not more than one value before open parenthesis
-				if(peek_null(&vals)->type != EXPR_PARENTH){
+				if(!has_top(&vals, EXPR_PARENTH)){
 					*err = ERR_TOO_MANY_VALUES;
 					break;
 				}
@@ -949,7 +963,7 @@ expr_t parse_expr(const char *src, name_trans_f callback, const char **endptr, p
 		}
 		
 		// Check if there is a remaining open parenth
-		if(*err == ERR_OK && peek_null(&ops)) *err = ERR_PARENTH_MISMATCH;
+		if(*err == ERR_OK && has_top(&ops, EXPR_PARENTH)) *err = ERR_PARENTH_MISMATCH;
 	}
 	
 	// Clean up ops stack
@@ -959,11 +973,11 @@ expr_t parse_expr(const char *src, name_trans_f callback, const char **endptr, p
 	
 	// Check that there is exactly one value left on the vals stack
 	if(*err == ERR_OK){
-		if(!peek_null(&vals)) *err = ERR_EMPTY_EXPRESSION;
-		else if(peek_null(&vals)->type == EXPR_PARENTH) *err = ERR_PARENTH_MISMATCH;
+		if(!(vals.ptr)) *err = ERR_EMPTY_EXPRESSION;
+		else if(has_top(&vals, EXPR_PARENTH)) *err = ERR_PARENTH_MISMATCH;
 		else tmp = pop(&vals);
 		
-		if(*err == ERR_OK && peek_null(&vals)){
+		if(*err == ERR_OK && vals.ptr){
 			push(&vals, tmp);
 			*err = ERR_TOO_MANY_VALUES;
 		}

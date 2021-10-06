@@ -465,7 +465,7 @@ int main(int argc, char *argv[]){
 							gtop = gcurs;
 							gcurs_idx = 0;
 						}
-						gcurs->curs = gcurs->text;  // Put cursor in text
+						if(gcurs) gcurs->curs = gcurs->text;  // Put cursor in text
 						
 						// Update graph to remove the curve for this equation
 						update_graph = 1;
